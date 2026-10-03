@@ -1,0 +1,30 @@
+# Normalizacion de fin de linea.
+# Sin esto, un clon en Windows deja entrypoint.sh con CRLF y el contenedor falla al
+# arrancar con un "no such file or directory" que no apunta a nada evidente.
+
+* text=auto eol=lf
+
+# Archivos que SIEMPRE tienen que llegar al contenedor con LF.
+*.sh      text eol=lf
+*.py      text eol=lf
+*.html    text eol=lf
+*.css     text eol=lf
+*.sql     text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.toml    text eol=lf
+*.ini     text eol=lf
+*.mako    text eol=lf
+Dockerfile        text eol=lf
+.dockerignore     text eol=lf
+.env.example      text eol=lf
+
+# Binarios: git nunca debe tocarlos.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.woff  binary
+*.woff2 binary
