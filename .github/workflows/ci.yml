@@ -1,0 +1,109 @@
+# Integracion continua de la API del Sistema Nacional.
+#
+# Corre en cada push (cualquier rama) y en cada Pull Request contra main. Render esta
+# configurado con `autoDeployTrigger: checksPass` (render.yaml): solo despliega un commit si
+# TODOS estos checks terminan en verde. Si el CI falla, no hay deploy.
+#
+# Los nombres de los jobs (calidad, imagen) son los que se exigen en la proteccion de main
+# (CONTRIBUTING.md seccion 8): no se renombran sin actualizar ese comando.
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+# Un push nuevo a la misma rama cancela la corrida anterior, que ya quedo vieja.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  calidad:
+    name: calidad
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.13"
+          enable-cache: true
+
+      - name: Instalar dependencias (lock exacto)
+        run: uv sync --locked
+
+      - name: Formato (ruff format)
+        run: uv run ruff format --check .
+
+      - name: Linter (ruff check)
+        run: uv run ruff check .
+
+      - name: Tests (pytest)
+        run: uv run pytest -q
+
+  imagen:
+    name: imagen
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      # Valores descartables, generados en cada corrida: el CI no usa ningun secreto real.
+      - name: Generar .env de CI
+        run: |
+          clave_db="$(openssl rand -hex 16)"
+          {
+            echo "APP_ENV=local"
+            echo "SECRET_KEY=$(openssl rand -hex 32)"
+            echo "PORT=8000"
+            echo "LOG_LEVEL=INFO"
+            echo "POSTGRES_USER=sistema_nacional"
+            echo "POSTGRES_PASSWORD=${clave_db}"
+            echo "POSTGRES_DB=sistema_nacional"
+            echo "DATABASE_URL=postgresql+psycopg://sistema_nacional:${clave_db}@db:5432/sistema_nacional"
+          } > .env
+
+      - name: Levantar docker compose (db + api de desarrollo)
+        run: docker compose up -d --build --wait --wait-timeout 180
+
+      - name: Smoke test del entorno local
+        run: |
+          curl --fail --silent --show-error localhost:8000/health
+          docker compose exec -T db sh -c \
+            'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "select version_num from alembic_version"' \
+            | grep -qx 0001
+
+      # La misma imagen que construye Render: target por defecto (produccion), PORT=10000.
+      - name: Construir la imagen de produccion
+        run: docker build --tag sistema-nacional:ci .
+
+      - name: Smoke test de la imagen de produccion (como en Render)
+        run: |
+          set -a; . ./.env; set +a
+          docker run -d --name api-produccion \
+            --network rescuesync-sistema-nacional_default \
+            -e APP_ENV=produccion -e PORT=10000 -e SECRET_KEY="$SECRET_KEY" \
+            -e DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}" \
+            -p 10000:10000 sistema-nacional:ci
+          for _ in $(seq 1 30); do
+            if curl --fail --silent localhost:10000/health; then exit 0; fi
+            sleep 2
+          done
+          docker logs api-produccion
+          exit 1
+
+      - name: Logs ante falla
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Limpiar
+        if: always()
+        run: |
+          docker rm -f api-produccion || true
+          docker compose down -v
