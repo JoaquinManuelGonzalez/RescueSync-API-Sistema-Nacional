@@ -47,6 +47,10 @@ jobs:
       - name: Tests (pytest)
         run: uv run pytest -q
 
+      # Valida el Blueprint contra el schema oficial de Render antes de que Render lo sincronice.
+      - name: Validar render.yaml
+        run: uvx check-jsonschema@0.38.2 --schemafile https://render.com/schema/render.yaml.json render.yaml
+
   imagen:
     name: imagen
     runs-on: ubuntu-latest
