@@ -65,4 +65,4 @@ mismo recurso. Se implementa junto con esos endpoints, en una épica posterior.
 
 - `200 {"status": "ok", "db": "ok"}` si la aplicación y la base responden.
 - `503` con `{"status": "error", "db": "error", "error": {...envelope...}}` si la base no
-  responde en 3 segundos.
+  responde en 2 segundos.

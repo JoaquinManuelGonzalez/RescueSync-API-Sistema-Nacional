@@ -34,8 +34,9 @@ VARIABLES_OPCIONALES: dict[str, str] = {
 VARIABLES_ENTERAS: tuple[str, ...] = ("PORT",)
 
 # Tiempo maximo para abrir una conexion a la base. Render da por fallido un health check que
-# no responde en 5 segundos: con 3 segundos, /health alcanza a contestar 503 antes de eso.
-SEGUNDOS_TIMEOUT_DE_CONEXION = 3
+# no responde en 5 segundos. El pool puede necesitar dos intentos (pre-ping de una conexion
+# vieja y una conexion nueva): con 2 segundos por intento, /health contesta 503 antes del limite.
+SEGUNDOS_TIMEOUT_DE_CONEXION = 2
 
 MENSAJE_FALTANTE = "Falta la variable de entorno obligatoria: {nombre}"
 MENSAJE_NO_ENTERA = "La variable de entorno {nombre} debe ser un numero entero"

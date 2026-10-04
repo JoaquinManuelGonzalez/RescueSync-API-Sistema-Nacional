@@ -86,4 +86,4 @@ def test_postgres_tiene_timeout_de_conexion(entorno_completo):
     opciones = construir_configuracion()["SQLALCHEMY_ENGINE_OPTIONS"]
 
     assert opciones["pool_pre_ping"] is True
-    assert opciones["connect_args"] == {"connect_timeout": 3}
+    assert opciones["connect_args"] == {"connect_timeout": 2}

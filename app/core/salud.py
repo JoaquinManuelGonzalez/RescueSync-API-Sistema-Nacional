@@ -2,7 +2,7 @@
 
 Lo consumen el healthcheck de docker-compose.yml (via healthcheck.py) y el health check HTTP de
 Render (`healthCheckPath: /health` en render.yaml). Render considera sana una instancia que
-responde 2xx en menos de 5 segundos: por eso la conexion a la base tiene un timeout de 3
+responde 2xx en menos de 5 segundos: por eso la conexion a la base tiene un timeout de 2
 segundos (ver `SEGUNDOS_TIMEOUT_DE_CONEXION` en configuracion.py).
 """
 
