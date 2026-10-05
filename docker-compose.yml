@@ -15,8 +15,9 @@ name: rescuesync-sistema-nacional
 
 services:
   db:
-    # Mismo major que la Render Postgres de render.yaml (postgresMajorVersion: "18").
-    image: postgres:18-trixie
+    # Mismo major que el PostgreSQL del proyecto de Supabase (ADR-004). Si Supabase lo
+    # actualiza, se cambia aca y cada integrante recrea su base con `docker compose down -v`.
+    image: postgres:17-trixie
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -24,9 +25,8 @@ services:
     ports:
       - "${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
-      # Desde PostgreSQL 18 la imagen guarda los datos en un subdirectorio versionado de
-      # /var/lib/postgresql, por eso se monta la carpeta padre.
-      - datos_postgres:/var/lib/postgresql
+      # Directorio de datos de la imagen oficial hasta PostgreSQL 17.
+      - datos_postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s

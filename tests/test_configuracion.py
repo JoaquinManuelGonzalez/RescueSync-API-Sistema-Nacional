@@ -61,6 +61,19 @@ def test_normalizar_url_agrega_sslmode_si_se_pide():
     assert url == "postgresql+psycopg://u:c@servidor/base?sslmode=require"
 
 
+def test_normalizar_url_acepta_la_uri_del_pooler_de_supabase():
+    # El usuario del Session pooler lleva el ref del proyecto despues de un punto.
+    url = normalizar_url_de_base(
+        "postgresql://postgres.abcdref:clave@aws-0-us-east-1.pooler.supabase.com:5432/postgres",
+        "require",
+    )
+
+    assert url == (
+        "postgresql+psycopg://postgres.abcdref:clave@aws-0-us-east-1.pooler.supabase.com:5432"
+        "/postgres?sslmode=require"
+    )
+
+
 def test_normalizar_url_respeta_sslmode_propio_de_la_url():
     url = normalizar_url_de_base("postgresql://u:c@servidor/base?sslmode=disable", "require")
 

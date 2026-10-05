@@ -27,7 +27,7 @@ VARIABLES_OPCIONALES: dict[str, str] = {
     "PORT": "8000",
     "LOG_LEVEL": "INFO",
     # Vacio: sin TLS hacia la base (PostgreSQL local de docker compose). En Render se fija en
-    # "require" desde render.yaml.
+    # "require" desde render.yaml, porque la conexion a Supabase viaja por internet.
     "DATABASE_SSLMODE": "",
 }
 
@@ -73,7 +73,7 @@ def _terminar(mensajes: list[str]) -> None:
 def normalizar_url_de_base(url: str, sslmode: str = "") -> str:
     """Adapta la URL de la base al driver que usa el proyecto.
 
-    Render entrega la cadena de conexion como `postgresql://...` (y algunos proveedores todavia
+    Supabase entrega la cadena de conexion como `postgresql://...` (y algunos proveedores todavia
     usan el alias `postgres://`). SQLAlchemy interpreta esos esquemas con psycopg2, que no esta
     instalado: el proyecto usa psycopg 3, cuyo dialecto es `postgresql+psycopg`.
 
@@ -104,7 +104,7 @@ def _opciones_del_engine(url: str) -> dict[str, object]:
     """Opciones del pool de SQLAlchemy segun el motor de la URL ya normalizada."""
     opciones: dict[str, object] = {
         # Descarta conexiones muertas del pool: el contenedor db se reinicia seguido en
-        # desarrollo, y la base free de Render puede reiniciarse sin aviso.
+        # desarrollo, y el pooler de Supabase puede cortar conexiones ociosas.
         "pool_pre_ping": True,
     }
     if make_url(url).get_backend_name() == "postgresql":
