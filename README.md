@@ -26,11 +26,12 @@ Aplicación web ──► Bonita (proceso BPMN) ──► API del Sistema Nacion
 4. [Variables de entorno](#variables-de-entorno)
 5. [Comandos frecuentes](#comandos-frecuentes)
 6. [Despliegue en Render](#despliegue-en-render)
-7. [Límites de los planes Free y runbooks](#límites-de-los-planes-free-y-runbooks)
-8. [Integración con Bonita](#integración-con-bonita)
-9. [Problemas conocidos](#problemas-conocidos)
-10. [Documentación](#documentación)
-11. [Registro de validación](#registro-de-validación)
+7. [Base de datos: local y nube](#base-de-datos-local-y-nube)
+8. [Límites de los planes Free y runbooks](#límites-de-los-planes-free-y-runbooks)
+9. [Integración con Bonita](#integración-con-bonita)
+10. [Problemas conocidos](#problemas-conocidos)
+11. [Documentación](#documentación)
+12. [Registro de validación](#registro-de-validación)
 
 ## Puesta en marcha
 
@@ -153,7 +154,7 @@ Detalle completo en [`docs/contratos/configuracion.md`](docs/contratos/configura
 | Variable | Obligatoria | Ejemplo | Descripción |
 |---|---|---|---|
 | `SECRET_KEY` | Sí | (cadena aleatoria) | Clave secreta de Flask |
-| `DATABASE_URL` | Sí | `postgresql+psycopg://sistema_nacional:clave@db:5432/sistema_nacional` | Conexión a PostgreSQL |
+| `DATABASE_URL` | Sí | `postgresql+psycopg://sistema_nacional:clave@db:5432/sistema_nacional` | Conexión a PostgreSQL. En local, la base `db`; en Render, la URI del Session pooler de Supabase |
 | `APP_ENV` | No | `local` | `local`, `evaluacion` o `produccion` |
 | `PORT` | No | `8000` | Puerto de la API (Render inyecta `10000`) |
 | `LOG_LEVEL` | No | `DEBUG` | `DEBUG`, `INFO`, `WARN`, `ERROR` |
@@ -225,19 +226,23 @@ arranque fallan, sigue corriendo la versión anterior.
    plan Free. Contraseña de la base **alfanumérica y larga** (un carácter especial rompe la
    URL); guardarla en un gestor de contraseñas.
 3. Menú **Integrations → Data API** → apagar **Enable Data API**.
-4. Botón **Connect** (arriba) → **Session pooler** → copiar la URI y reemplazar
-   `[YOUR-PASSWORD]` por la contraseña. Tiene esta forma:
+4. Botón **Connect** (arriba) → pestaña **Direct** → método **Session pooler** → copiar la URI
+   y reemplazar `[YOUR-PASSWORD]` por la contraseña (sin los corchetes). Tiene esta forma:
    `postgresql://postgres.<ref>:<clave>@aws-<n>-us-east-1.pooler.supabase.com:5432/postgres`
-5. *(Opcional, recomendado)* probarla desde la PC con la imagen de producción, antes de tocar
-   Render:
+   Revisar que diga `us-east-1`, puerto `5432` y usuario `postgres.<ref>`.
+5. Guardarla en un archivo `.env.supabase` en la raíz del repo, con una sola línea
+   `DATABASE_URL=<URI>` (ver [El archivo `.env.supabase`](#el-archivo-envsupabase)).
+6. *(Recomendado)* probarla desde la PC con la imagen de producción, antes de tocar Render:
 
    ```bash
    docker build -t sistema-nacional:local .
-   docker run --rm -p 10000:10000 -e APP_ENV=produccion -e PORT=10000 -e SECRET_KEY=prueba \
-     -e DATABASE_SSLMODE=require -e DATABASE_URL="<URI del paso 4>" sistema-nacional:local
+   docker run --rm -p 10000:10000 --env-file .env.supabase -e APP_ENV=produccion -e PORT=10000 \
+     -e SECRET_KEY=prueba -e DATABASE_SSLMODE=require sistema-nacional:local
    # en otra terminal:
    curl http://localhost:10000/health   # {"db":"ok","status":"ok"}
    ```
+
+   El contenedor aplica las migraciones en Supabase al arrancar, igual que en Render.
 
 **Web service en Render**
 
@@ -251,6 +256,118 @@ arranque fallan, sigue corriendo la versión anterior.
 
 Si el Blueprint ya existía, Render no vuelve a pedir `DATABASE_URL` (ignora `sync: false` al
 actualizar): se carga en servicio → **Environment** → **Save and deploy**.
+
+## Base de datos: local y nube
+
+Hay **dos bases con el mismo esquema**, y nunca se mezclan:
+
+| | Local | Nube |
+|---|---|---|
+| Dónde | Contenedor `db` del `docker-compose.yml` (`postgres:17-trixie`) | Proyecto de Supabase (PostgreSQL 17) |
+| Quién la crea | `docker compose up`, en un volumen propio de cada integrante | Se creó una sola vez en el dashboard ([Crear el entorno de cero](#crear-el-entorno-de-cero)) |
+| Quién crea las tablas | Las migraciones, al arrancar el contenedor `api` | Las migraciones, al arrancar cada deploy en Render |
+| Datos | Descartables (`docker compose down -v` la borra) | Compartidos por todo el equipo y por Bonita. **Sin backups** |
+| Cómo se consulta | Adminer o `psql` | SQL Editor o Table Editor de Supabase |
+
+La API **nunca** usa la base de la nube cuando corre en local: el `.env` apunta siempre a `db`.
+
+### Acceso del equipo a Supabase
+
+Quien administra el proyecto (rol **Owner**) invita a cada integrante desde **Organization
+settings → Team → Invite** con el rol **Developer**. Un Developer puede usar el SQL Editor y el
+Table Editor, pero no ve la contraseña de la base ni cambia la configuración del proyecto. El
+plan Free admite miembros ilimitados (roles Owner, Administrator y Developer).
+
+La contraseña de la base (y por lo tanto la URI) la tiene solo quien administra el proyecto.
+
+### Flujo de una migración
+
+El esquema se cambia **solo con migraciones de Alembic**: se generan y prueban en local, y llegan
+a Supabase solas con el deploy.
+
+1. Crear o modificar el modelo en `app/modulos/<modulo>/modelos.py`. Si el módulo es nuevo,
+   agregar su import en `importar_modelos()` (`app/modulos/__init__.py`): Alembic no ve un
+   modelo que nadie importa.
+2. Generar la migración contra la base local:
+   `docker compose exec api flask db migrate -m "agrega tabla de compromisos"`
+3. Revisar el archivo generado en `migrations/versions/`: Alembic no detecta todo (por ejemplo,
+   renombres de columnas, que interpreta como borrar y crear).
+4. Aplicarla y probar ida y vuelta en local: `docker compose exec api flask db upgrade`, después
+   `docker compose exec api flask db downgrade` (sin argumento vuelve una revisión) y de nuevo
+   `upgrade`.
+5. Commit y push. Con el CI en verde, Render despliega y el `entrypoint.sh` corre
+   `flask db upgrade` contra Supabase antes de arrancar la API. Si la migración falla, el deploy
+   no pasa y queda la versión anterior.
+6. Verificar: en los logs del deploy aparece `Running upgrade <anterior> -> <nueva>`, o en el SQL
+   Editor de Supabase `select version_num from alembic_version;` muestra la revisión nueva.
+
+Reglas:
+
+- **Nunca cambiar el esquema de la nube a mano** (Table Editor, o `create` / `alter` / `drop` en
+  el SQL Editor). Alembic no se entera, y la próxima migración falla o deja la base distinta de
+  los modelos.
+- **Nunca correr `flask db upgrade` desde la PC contra Supabase con migraciones que no están
+  desplegadas.** La base quedaría en una revisión que el código de Render no conoce, y el
+  siguiente arranque falla con `Can't locate revision`.
+- **Una migración desplegada no se revierte con `downgrade` en la nube**: se corrige con una
+  migración nueva. `downgrade` se usa solo en local.
+- **Las migraciones que borran datos** (`drop_table`, `drop_column`) se revisan dos veces:
+  Supabase Free no tiene backups.
+- Si dos integrantes generan migraciones en paralelo, Alembic queda con dos "heads" y
+  `flask db upgrade` falla. Se ve con `docker compose exec api flask db heads` y se resuelve con
+  `docker compose exec api flask db merge -m "une migraciones" heads`.
+
+### Consultar la base
+
+**Local:**
+
+```bash
+docker compose --profile herramientas up -d    # Adminer en http://localhost:8081
+# Sistema: PostgreSQL, servidor: db, usuario / contraseña / base: los del .env
+
+docker compose exec db psql -U sistema_nacional -d sistema_nacional   # consola psql
+```
+
+**Nube:** dashboard de Supabase → proyecto → **SQL Editor** (consultas) o **Table Editor** (ver
+datos). Las consultas `select` se pueden hacer libremente. Las que modifican datos (`insert`,
+`update`, `delete`) se coordinan con el equipo, porque la base es compartida y la usa Bonita. Las
+que cambian el esquema no se hacen nunca (ver reglas).
+
+### Comandos puntuales contra la nube
+
+El plan Free de Render no tiene Shell. Quien tiene el `.env.supabase` puede correr un comando
+puntual desde su PC con la misma imagen de la API, construida desde el **mismo commit que está
+desplegado**:
+
+```bash
+docker build -t sistema-nacional:local .
+
+# Revisión de Alembic aplicada en Supabase
+docker run --rm --env-file .env.supabase -e SECRET_KEY=x -e DATABASE_SSLMODE=require \
+  --entrypoint flask sistema-nacional:local db current
+
+# Historial de migraciones que conoce el código
+docker run --rm --env-file .env.supabase -e SECRET_KEY=x -e DATABASE_SSLMODE=require \
+  --entrypoint flask sistema-nacional:local db history
+
+# Consola psql contra Supabase (sin instalar nada)
+docker run --rm -it --env-file .env.supabase postgres:17-trixie \
+  sh -c 'psql "$DATABASE_URL?sslmode=require"'
+```
+
+`--entrypoint flask` saltea el `entrypoint.sh`: el comando no aplica migraciones.
+
+### El archivo `.env.supabase`
+
+Archivo local y opcional, solo para quien administra la base. Tiene una sola línea:
+
+```
+DATABASE_URL=postgresql://postgres.<ref>:<clave>@aws-<n>-us-east-1.pooler.supabase.com:5432/postgres
+```
+
+Git y Docker lo ignoran (`.env.*` está en `.gitignore` y en `.dockerignore`). Usarlo con
+`--env-file` evita que la URI, que incluye la contraseña, quede escrita en la historia de la
+terminal. **No** reemplaza al `.env`: la API local sigue usando su propia base.
 
 ## Límites de los planes Free y runbooks
 
@@ -342,9 +459,12 @@ proceso:
 6. **La URL pública responde 503 con `"db": "error"`.** El proyecto de Supabase está pausado
    por inactividad: ver el runbook "Supabase pausó el proyecto".
 7. **`password authentication failed` o `DATABASE_URL no es una URL de base de datos valida` en
-   los logs de Render.** La contraseña
-   de `DATABASE_URL` no coincide con la de Supabase o tiene caracteres especiales sin
-   codificar: rotarla por una alfanumérica (runbook arriba).
+   los logs de Render.** La contraseña de `DATABASE_URL` no coincide con la de Supabase o tiene
+   caracteres especiales sin codificar: rotarla por una alfanumérica (runbook arriba).
+8. **El deploy falla con `Can't locate revision` en los logs de Render.** Supabase quedó en una
+   revisión de Alembic que el código desplegado no tiene (alguien migró desde su PC con una
+   migración sin desplegar). Desplegar el commit que contiene esa migración, o pedir a quien
+   administra la base que lo resuelva antes de seguir.
 
 ## Documentación
 

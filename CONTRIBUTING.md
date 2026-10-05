@@ -139,7 +139,7 @@ Ejemplos:
 ```
 chore(repo): agrega pyproject y configuracion de ruff (HU-SN-01)
 feat(salud): agrega endpoint /health con chequeo de base (HU-SN-02)
-docs(readme): documenta runbook de recreacion de la base [skip render] (HU-SN-07)
+docs(readme): documenta runbook de pausa de supabase [skip render] (HU-SN-07)
 ```
 
 Los commits que solo tocan documentación llevan `[skip render]` en el mensaje para que Render
@@ -214,8 +214,11 @@ actualizada, PR con la plantilla, aprobación, squash.
   deploy y sigue corriendo la versión anterior.
 - Los cambios que solo tocan `docs/**` o archivos `.md` no disparan deploy (`buildFilter`).
   Para otros commits sin impacto se puede usar `[skip render]` en el mensaje.
-- Las migraciones de Alembic corren solas al arrancar el contenedor (`entrypoint.sh`). Una
-  migración que falla aborta el arranque y Render mantiene la versión anterior.
+- Las migraciones de Alembic corren solas al arrancar el contenedor (`entrypoint.sh`), también
+  contra Supabase en cada deploy. Una migración que falla aborta el arranque y Render mantiene
+  la versión anterior. El esquema de la nube se cambia **solo** con migraciones: nunca a mano
+  desde el dashboard de Supabase (flujo completo y reglas en el README, "Base de datos: local y
+  nube").
 - La base de datos no está en Render sino en Supabase (ADR-004): su configuración se hace en el
   dashboard de Supabase, y `DATABASE_URL` se carga a mano en el dashboard de Render.
 - Nunca se commitean secretos: los valores sensibles viven en Render (variables generadas o

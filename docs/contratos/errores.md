@@ -53,6 +53,7 @@ Los módulos de dominio pueden definir códigos más específicos subclasificand
 | 2xx | Operación realizada | Continuar el flujo |
 | 4xx | La API evaluó la solicitud y **la rechazó por su contenido** | **No reintentar** con el mismo cuerpo; tomar el camino de rechazo del proceso |
 | 5xx | Falla de disponibilidad | Reintentar con backoff; si persiste, camino de error técnico |
+| 503 `SERVICIO_NO_DISPONIBLE` sostenido | La base no responde; en la nube, casi siempre el proyecto de Supabase pausado por inactividad | Camino de error técnico y avisar al equipo: se resuelve reactivando el proyecto (runbook del README), no reintentando |
 | Sin respuesta / timeout | El servicio puede estar despertando (plan Free de Render, ~1 minuto) | Reintentar; antes de una demo, despertar con `GET /health` |
 
 Las operaciones que comprometan recursos aceptarán una clave de idempotencia (encabezado

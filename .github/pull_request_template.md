@@ -22,7 +22,9 @@
 - [ ] Se respeta la convención de nombres de `CONTRIBUTING.md` (paquetes, clases, funciones,
       tablas, columnas, rutas, ramas).
 - [ ] Los commits siguen Conventional Commits y referencian la HU (`(HU-XX)`).
-- [ ] Si se agregó una migración, se probó `flask db upgrade` contra PostgreSQL (no solo SQLite).
+- [ ] Si se agregó una migración, se probó `flask db upgrade` y `downgrade` contra PostgreSQL (no
+      solo SQLite). Si borra tablas o columnas, se aclara en el PR: Supabase Free no tiene
+      backups.
 - [ ] Si se agregó una variable de entorno: está en `.env.example`, en
       `docs/contratos/configuracion.md`, en la tabla del README y, si aplica, en `render.yaml`.
 - [ ] La documentación relacionada (README, ADR, contratos) está actualizada si el cambio la

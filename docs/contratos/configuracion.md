@@ -44,7 +44,7 @@ corriendo `docker compose up api`.
 
 ## 3. Entornos
 
-| Aspecto | Local (`docker compose`) | Nube (Render) |
+| Aspecto | Local (`docker compose`) | Nube (Render + Supabase) |
 |---|---|---|
 | `APP_ENV` | `local` | `produccion` |
 | Origen de las variables | `.env` propio de cada integrante, nunca versionado | `render.yaml` + valores generados o cargados en el dashboard |
@@ -61,6 +61,9 @@ corriendo `docker compose up api`.
 - **Secretos futuros** (credenciales de Bonita, claves JWT) se declaran en `render.yaml` con
   `sync: false`. Render los pide solo al crear el Blueprint por primera vez; si se agregan
   después, se cargan a mano en **Service → Environment** del dashboard.
+- **`.env.supabase`** (opcional, solo para quien administra la base): archivo local con la
+  `DATABASE_URL` de Supabase, para comandos puntuales contra la nube con `docker run
+  --env-file`. Lo ignoran git y Docker (`.env.*`). No reemplaza al `.env`.
 - **No se usan como `ARG` en el Dockerfile.** Render convierte las variables de entorno en build
   args, y un `ARG` con un secreto quedaría grabado en la imagen.
 - **Si un secreto se filtra**, se rota de inmediato en el sistema correspondiente (Render,
