@@ -1,9 +1,9 @@
 # ADR-002: Plataforma de despliegue en la nube
 
-- Estado: Aceptado
+- Estado: Reemplazado parcialmente por ADR-004
 - Fecha: 2026-10-03
 - Reemplaza a: —
-- Reemplazado por: —
+- Reemplazado por: ADR-004 (solo la base de datos)
 
 ## Contexto
 

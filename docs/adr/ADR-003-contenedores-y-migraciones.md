@@ -1,9 +1,9 @@
 # ADR-003: Contenedores y ejecución de migraciones
 
-- Estado: Aceptado
+- Estado: Reemplazado parcialmente por ADR-004
 - Fecha: 2026-10-03
 - Reemplaza a: —
-- Reemplazado por: —
+- Reemplazado por: ADR-004 (solo la versión local de PostgreSQL)
 
 ## Contexto
 

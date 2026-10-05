@@ -19,10 +19,11 @@ Todo ADR nuevo parte de la plantilla [`ADR-000-plantilla.md`](./ADR-000-plantill
 |---|---|---|---|---|
 | 000 | Plantilla de ADR | — | — | [ADR-000-plantilla.md](./ADR-000-plantilla.md) |
 | 001 | Framework de la API | Aceptado | 2026-10-03 | [ADR-001-framework-api.md](./ADR-001-framework-api.md) |
-| 002 | Plataforma de despliegue en la nube | Aceptado | 2026-10-03 | [ADR-002-plataforma-cloud-render.md](./ADR-002-plataforma-cloud-render.md) |
-| 003 | Contenedores y ejecución de migraciones | Aceptado | 2026-10-03 | [ADR-003-contenedores-y-migraciones.md](./ADR-003-contenedores-y-migraciones.md) |
+| 002 | Plataforma de despliegue en la nube | Reemplazado parcialmente por ADR-004 | 2026-10-03 | [ADR-002-plataforma-cloud-render.md](./ADR-002-plataforma-cloud-render.md) |
+| 003 | Contenedores y ejecución de migraciones | Reemplazado parcialmente por ADR-004 | 2026-10-03 | [ADR-003-contenedores-y-migraciones.md](./ADR-003-contenedores-y-migraciones.md) |
+| 004 | Base de datos administrada en Supabase | Aceptado | 2026-10-05 | [ADR-004-base-de-datos-supabase.md](./ADR-004-base-de-datos-supabase.md) |
 
-El siguiente ADR usa el número `004`.
+El siguiente ADR usa el número `005`.
 
 ## Ciclo de vida
 
