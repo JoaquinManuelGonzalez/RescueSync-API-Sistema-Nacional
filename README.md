@@ -2,7 +2,8 @@
 
 API del Sistema Nacional creada para el proyecto RescueSync de la materia Desarrollo de Software
 en Sistemas Distribuidos. Responde la habilitación de ONGs y gestiona la reserva y el compromiso
-de recursos. Corre dockerizada, en local con `docker compose` y en la nube en Render.
+de recursos. Corre dockerizada, en local con `docker compose` y en la nube en Render, con la base
+PostgreSQL en Supabase.
 
 **URL pública:** `https://rescuesync-sistema-nacional.onrender.com`
 (salud: [`/health`](https://rescuesync-sistema-nacional.onrender.com/health))
@@ -13,7 +14,8 @@ de recursos. Corre dockerizada, en local con `docker compose` y en la nube en Re
 
 ```
 Aplicación web ──► Bonita (proceso BPMN) ──► API del Sistema Nacional ──► PostgreSQL
-                    conectores REST            Flask + Gunicorn            (Render Postgres)
+                    conectores REST            Flask + Gunicorn            (Supabase)
+                                               (Render)
 ```
 
 ## Índice
@@ -24,7 +26,7 @@ Aplicación web ──► Bonita (proceso BPMN) ──► API del Sistema Nacion
 4. [Variables de entorno](#variables-de-entorno)
 5. [Comandos frecuentes](#comandos-frecuentes)
 6. [Despliegue en Render](#despliegue-en-render)
-7. [Límites del plan Free y runbooks](#límites-del-plan-free-y-runbooks)
+7. [Límites de los planes Free y runbooks](#límites-de-los-planes-free-y-runbooks)
 8. [Integración con Bonita](#integración-con-bonita)
 9. [Problemas conocidos](#problemas-conocidos)
 10. [Documentación](#documentación)
@@ -116,10 +118,11 @@ uv run flask --app app.wsgi:app run --debug --port 8000
 | Flask-Migrate / Alembic | 4.1.0 / 1.20.0 | `pyproject.toml` / `uv.lock` |
 | psycopg (binary) | 3.3.5 | `pyproject.toml` / `uv.lock` |
 | python-dotenv | 1.2.3 | `pyproject.toml` / `uv.lock` |
-| PostgreSQL | 18 | `docker-compose.yml`, `render.yaml` |
+| PostgreSQL | 17 (el mismo major que Supabase) | `docker-compose.yml` |
 | Ruff (dev) | 0.16.7 | `pyproject.toml` / `uv.lock` |
 | pytest (dev) | 9.1.1 | `pyproject.toml` / `uv.lock` |
 | Render (PaaS) | plan Free | `render.yaml` |
+| Supabase (base de datos) | plan Free, `us-east-1` | dashboard de Supabase (ADR-004) |
 
 ## Mapa del repositorio
 
@@ -139,7 +142,7 @@ Dockerfile              imagen multi-stage: desarrollo / produccion (por defecto
 entrypoint.sh           aplica migraciones y arranca el servidor
 healthcheck.py          healthcheck del contenedor para docker compose
 docker-compose.yml      entorno local: db + api (+ adminer con --profile herramientas)
-render.yaml             Blueprint de Render: infraestructura de la nube como código
+render.yaml             Blueprint de Render: web service de la nube como código
 .env.example            plantilla de variables de entorno
 ```
 
@@ -154,7 +157,7 @@ Detalle completo en [`docs/contratos/configuracion.md`](docs/contratos/configura
 | `APP_ENV` | No | `local` | `local`, `evaluacion` o `produccion` |
 | `PORT` | No | `8000` | Puerto de la API (Render inyecta `10000`) |
 | `LOG_LEVEL` | No | `DEBUG` | `DEBUG`, `INFO`, `WARN`, `ERROR` |
-| `DATABASE_SSLMODE` | No | (vacío) | `require` en Render |
+| `DATABASE_SSLMODE` | No | (vacío) | `require` en la nube (Supabase) |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Sí (compose) | `sistema_nacional` | Credenciales del PostgreSQL local |
 | `POSTGRES_HOST_PORT` | No | `5433` | Puerto del host para PostgreSQL |
 
@@ -187,12 +190,14 @@ uv run ruff format --check . && uv run ruff check . && uv run pytest
 
 ## Despliegue en Render
 
-La infraestructura está declarada en [`render.yaml`](render.yaml) (Render Blueprint):
+| Recurso | Nombre | Plan | Región | Dónde se configura |
+|---|---|---|---|---|
+| Web service (Docker) en Render | `rescuesync-sistema-nacional` | Free | virginia | [`render.yaml`](render.yaml) (Render Blueprint) |
+| PostgreSQL 17 en Supabase | `rescuesync-sistema-nacional` | Free | East US (North Virginia) | Dashboard de Supabase |
 
-| Recurso | Nombre | Plan | Región |
-|---|---|---|---|
-| Web service (Docker) | `rescuesync-sistema-nacional` | Free | virginia |
-| Render Postgres 18 | `rescuesync-sn-db` | Free | virginia |
+La base está en Supabase y no en Render porque la Render Postgres Free expira a los 30 días; la
+de Supabase no expira (decisión en
+[`docs/adr/ADR-004-base-de-datos-supabase.md`](docs/adr/ADR-004-base-de-datos-supabase.md)).
 
 **Cómo se despliega:** push a la rama vinculada → GitHub Actions corre el CI → si **todos** los
 checks pasan, Render construye la imagen desde el `Dockerfile` y la despliega
@@ -204,43 +209,85 @@ arranque fallan, sigue corriendo la versión anterior.
   integrar la épica; ver `CONTRIBUTING.md`).
 - Los cambios solo en `docs/**` o en archivos `.md` no despliegan. Para saltear el deploy de
   otro commit, agregar `[skip render]` al mensaje.
-- HTTPS y certificado los gestiona Render. La base no es accesible desde internet
-  (`ipAllowList: []`): solo la alcanza el web service por la red privada.
+- HTTPS y certificado los gestiona Render. La API llega a Supabase por internet, con TLS
+  obligatorio (`DATABASE_SSLMODE=require`) y por el **Session pooler**: la conexión directa de
+  Supabase es solo IPv6 y Render solo sale por IPv4.
+- La Data API (REST) de Supabase está **deshabilitada**: la base solo la usa esta API.
 - Los logs están en el dashboard de Render → servicio → **Logs**. El workspace gratuito de
   Render admite un solo miembro: quien administra la cuenta comparte los logs con el equipo.
 
 ### Crear el entorno de cero
 
+**Base en Supabase**
+
+1. Cuenta en [Supabase](https://supabase.com/dashboard) (con "Continue with GitHub").
+2. **New project**: nombre `rescuesync-sistema-nacional`, región **East US (North Virginia)**,
+   plan Free. Contraseña de la base **alfanumérica y larga** (un carácter especial rompe la
+   URL); guardarla en un gestor de contraseñas.
+3. Menú **Integrations → Data API** → apagar **Enable Data API**.
+4. Botón **Connect** (arriba) → **Session pooler** → copiar la URI y reemplazar
+   `[YOUR-PASSWORD]` por la contraseña. Tiene esta forma:
+   `postgresql://postgres.<ref>:<clave>@aws-<n>-us-east-1.pooler.supabase.com:5432/postgres`
+5. *(Opcional, recomendado)* probarla desde la PC con la imagen de producción, antes de tocar
+   Render:
+
+   ```bash
+   docker build -t sistema-nacional:local .
+   docker run --rm -p 10000:10000 -e APP_ENV=produccion -e PORT=10000 -e SECRET_KEY=prueba \
+     -e DATABASE_SSLMODE=require -e DATABASE_URL="<URI del paso 4>" sistema-nacional:local
+   # en otra terminal:
+   curl http://localhost:10000/health   # {"db":"ok","status":"ok"}
+   ```
+
+**Web service en Render**
+
 1. Cuenta en [Render](https://dashboard.render.com) (con "Sign up with GitHub") y la app de
    Render instalada en GitHub con acceso a este repositorio.
-2. Dashboard → **New → Blueprint** → conectar este repositorio → rama vinculada → **Deploy
-   Blueprint**. Render crea la base, el web service y genera `SECRET_KEY`.
-3. Esperar el primer deploy en la pestaña **Events** y verificar `/health`.
+2. Dashboard → **New → Blueprint** → conectar este repositorio → rama vinculada. Render pide el
+   valor de `DATABASE_URL`: pegar la URI de Supabase. **Deploy Blueprint**: Render crea el web
+   service y genera `SECRET_KEY`.
+3. Esperar el primer deploy en la pestaña **Events** y verificar `/health`. En Supabase,
+   **SQL Editor** → `select version_num from alembic_version;` muestra la última migración.
 
-## Límites del plan Free y runbooks
+Si el Blueprint ya existía, Render no vuelve a pedir `DATABASE_URL` (ignora `sync: false` al
+actualizar): se carga en servicio → **Environment** → **Save and deploy**.
 
-Según la documentación de Render:
+## Límites de los planes Free y runbooks
+
+Web service, según la documentación de Render:
 
 | Límite | Impacto |
 |---|---|
 | El servicio **se duerme a los 15 min** sin tráfico y tarda ~1 min en despertar | El primer llamado después de un rato ocioso es lento (ver Bonita abajo) |
-| La **base Free expira a los 30 días** de creada (14 días de gracia y después se borra) | Hay que recrearla (runbook abajo). Los datos se pierden |
-| 1 base Free por workspace, 1 GB, **sin backups** | No guardar nada que no se pueda regenerar |
 | 750 horas de instancia por mes por workspace | Alcanza para un servicio encendido todo el mes |
 | Sin pre-deploy command, sin Shell, sin one-off jobs | Por eso las migraciones corren en `entrypoint.sh` |
 | Render puede reiniciar o mantener servicios Free sin aviso | Reintentar ante 5xx o timeouts |
 
-### Runbook: la base Free expiró (o está por expirar)
+Base de datos, según la documentación de Supabase:
 
-Render avisa por mail antes del vencimiento. Para recrearla:
+| Límite | Impacto |
+|---|---|
+| El proyecto **se pausa tras 7 días sin actividad** | `/health` responde 503 hasta reactivarlo (runbook abajo). Los datos se conservan |
+| 500 MB por proyecto, **sin backups** automáticos | No guardar nada que no se pueda regenerar |
+| 2 proyectos activos por cuenta | Este proyecto ocupa uno |
 
-1. Dashboard → `rescuesync-sn-db` → **Settings** → **Delete Database**.
-2. Dashboard → **Blueprints** → el Blueprint de este repo → **Manual Sync**. Render detecta que
-   falta la base declarada en `render.yaml` y la crea de nuevo, vacía.
-3. Servicio `rescuesync-sistema-nacional` → **Manual Deploy → Deploy latest commit**, para que
-   arranque con la nueva `DATABASE_URL`. El `entrypoint.sh` aplica todas las migraciones y el
-   esquema queda reconstruido.
-4. Verificar `GET /health` → 200 y agendar la nueva fecha de expiración (30 días).
+### Runbook: Supabase pausó el proyecto
+
+Síntoma: `/health` responde 503 con `"db": "error"` y en los logs de Render aparece
+`salud_degradada`.
+
+1. [Dashboard de Supabase](https://supabase.com/dashboard) → proyecto
+   `rescuesync-sistema-nacional` → **Restore project**.
+2. Esperar a que el proyecto figure activo (puede tardar unos minutos).
+3. Verificar `GET /health` → 200. No hace falta redeployar en Render: el pool de conexiones
+   descarta las conexiones muertas solo.
+
+### Runbook: rotar la contraseña de la base
+
+1. Supabase → **Database → Settings** → **Reset database password** (alfanumérica y larga).
+2. Render → servicio → **Environment** → editar `DATABASE_URL` con la contraseña nueva →
+   **Save and deploy**.
+3. Verificar `GET /health` → 200.
 
 ### Runbook: despertar el servicio antes de una demo
 
@@ -249,6 +296,7 @@ curl https://rescuesync-sistema-nacional.onrender.com/health
 ```
 
 Repetir hasta recibir `{"db":"ok","status":"ok"}` (el primer intento puede tardar ~1 minuto).
+Si responde 503 con `"db": "error"`, la base está pausada: seguir el runbook de Supabase.
 
 ## Integración con Bonita
 
@@ -287,14 +335,23 @@ proceso:
    coincide con `POSTGRES_PASSWORD`.
 4. **Cambié `POSTGRES_PASSWORD` y ahora la API no conecta.** PostgreSQL solo toma las
    credenciales al crear el volumen. Para empezar de cero: `docker compose down -v`.
+   Lo mismo si `db` no arranca después de un cambio de versión de PostgreSQL en
+   `docker-compose.yml` (por ejemplo, el paso de 18 a 17 para igualar a Supabase): los datos de
+   un major no sirven para otro.
 5. **La URL pública tarda ~1 minuto en responder.** Es el spin-down del plan Free, no una falla.
+6. **La URL pública responde 503 con `"db": "error"`.** El proyecto de Supabase está pausado
+   por inactividad: ver el runbook "Supabase pausó el proyecto".
+7. **`password authentication failed` o `DATABASE_URL no es una URL de base de datos valida` en
+   los logs de Render.** La contraseña
+   de `DATABASE_URL` no coincide con la de Supabase o tiene caracteres especiales sin
+   codificar: rotarla por una alfanumérica (runbook arriba).
 
 ## Documentación
 
 | Documento | Contenido |
 |---|---|
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Convenciones de código, ramas, commits, flujo de épica, pase a `main` y despliegue continuo |
-| [`docs/adr/`](docs/adr/README.md) | ADR-001 framework, ADR-002 plataforma cloud (Render), ADR-003 contenedores y migraciones |
+| [`docs/adr/`](docs/adr/README.md) | ADR-001 framework, ADR-002 plataforma cloud (Render), ADR-003 contenedores y migraciones, ADR-004 base de datos en Supabase |
 | [`docs/contratos/configuracion.md`](docs/contratos/configuracion.md) | Variables de entorno, fail-fast y gestión de secretos |
 | [`docs/contratos/errores.md`](docs/contratos/errores.md) | Envelope de error y qué significa cada código para Bonita |
 | [`docs/contratos/logging.md`](docs/contratos/logging.md) | Formato JSON de logs e id de correlación |

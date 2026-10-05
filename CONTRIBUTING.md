@@ -216,5 +216,7 @@ actualizada, PR con la plantilla, aprobación, squash.
   Para otros commits sin impacto se puede usar `[skip render]` en el mensaje.
 - Las migraciones de Alembic corren solas al arrancar el contenedor (`entrypoint.sh`). Una
   migración que falla aborta el arranque y Render mantiene la versión anterior.
+- La base de datos no está en Render sino en Supabase (ADR-004): su configuración se hace en el
+  dashboard de Supabase, y `DATABASE_URL` se carga a mano en el dashboard de Render.
 - Nunca se commitean secretos: los valores sensibles viven en Render (variables generadas o
-  cargadas en el dashboard) y en el `.env` local de cada integrante.
+  cargadas en el dashboard), en Supabase y en el `.env` local de cada integrante.

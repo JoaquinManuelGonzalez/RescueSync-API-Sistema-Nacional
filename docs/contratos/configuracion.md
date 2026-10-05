@@ -13,11 +13,11 @@ RescueSync, reducido a lo que usa la API.
 | Variable | Obligatoria (S/N) | Valor por defecto | Descripción | En Render |
 |---|---|---|---|---|
 | `SECRET_KEY` | S | — | Clave secreta de Flask | Generada por Render (`generateValue: true`) |
-| `DATABASE_URL` | S | — | Cadena de conexión a PostgreSQL. Acepta `postgres://`, `postgresql://` o `postgresql+psycopg://`; la aplicación la normaliza al driver psycopg 3 | Tomada de la base (`fromDatabase`, URL interna) |
+| `DATABASE_URL` | S | — | Cadena de conexión a PostgreSQL. Acepta `postgres://`, `postgresql://` o `postgresql+psycopg://`; la aplicación la normaliza al driver psycopg 3 | URI del Session pooler de Supabase, cargada a mano en el dashboard (`sync: false`) |
 | `APP_ENV` | N | `local` | Entorno de ejecución (`local`, `evaluacion`, `produccion`). En `produccion` se activa `ProxyFix` para el balanceador de Render | `produccion` |
 | `PORT` | N | `8000` | Puerto en el que escucha la aplicación dentro del contenedor | Lo inyecta Render (`10000`) |
 | `LOG_LEVEL` | N | `INFO` | Nivel mínimo de log (`DEBUG`, `INFO`, `WARN`, `ERROR`) | `INFO` |
-| `DATABASE_SSLMODE` | N | (vacío) | Si tiene valor, se agrega como `sslmode` a la URL de la base. Vacío para el PostgreSQL local | `require` |
+| `DATABASE_SSLMODE` | N | (vacío) | Si tiene valor, se agrega como `sslmode` a la URL de la base. Vacío para el PostgreSQL local | `require` (la conexión a Supabase viaja por internet) |
 
 ### Leídas por la infraestructura (nunca por la aplicación)
 
@@ -48,7 +48,7 @@ corriendo `docker compose up api`.
 |---|---|---|
 | `APP_ENV` | `local` | `produccion` |
 | Origen de las variables | `.env` propio de cada integrante, nunca versionado | `render.yaml` + valores generados o cargados en el dashboard |
-| Base de datos | Contenedor `postgres:18-trixie`, datos descartables | Render Postgres 18 (Free), accesible solo por la red privada |
+| Base de datos | Contenedor `postgres:17-trixie`, datos descartables | Supabase PostgreSQL 17 (Free), por el Session pooler (ver ADR-004) |
 | TLS hacia la base | No | Sí (`DATABASE_SSLMODE=require`) |
 | Consumidor | Bonita local apuntando a `http://localhost:8000` | Bonita apuntando a la URL pública HTTPS |
 
@@ -56,15 +56,17 @@ corriendo `docker compose up api`.
 
 - **Ningún secreto se versiona.** `.env` y cualquier `.env.*` (salvo `.env.example`) están en
   `.gitignore`. `render.yaml` no contiene valores secretos: `SECRET_KEY` la genera Render y
-  `DATABASE_URL` sale de la base.
+  `DATABASE_URL` (que incluye la contraseña de la base de Supabase) se carga a mano en
+  **Service → Environment** del dashboard de Render.
 - **Secretos futuros** (credenciales de Bonita, claves JWT) se declaran en `render.yaml` con
   `sync: false`. Render los pide solo al crear el Blueprint por primera vez; si se agregan
   después, se cargan a mano en **Service → Environment** del dashboard.
 - **No se usan como `ARG` en el Dockerfile.** Render convierte las variables de entorno en build
   args, y un `ARG` con un secreto quedaría grabado en la imagen.
 - **Si un secreto se filtra**, se rota de inmediato en el sistema correspondiente (Render,
-  PostgreSQL, Bonita), se avisa al equipo y se considera comprometido aunque se limpie el
-  historial de git.
+  Supabase, Bonita), se avisa al equipo y se considera comprometido aunque se limpie el
+  historial de git. La contraseña de la base se rota con el runbook "Rotar la contraseña de la
+  base" del README.
 
 Verificación de que `.env` no llega al remoto:
 
