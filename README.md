@@ -206,8 +206,7 @@ checks pasan, Render construye la imagen desde el `Dockerfile` y la despliega
 `/health` responde 200, Render le pasa el tráfico sin cortar el servicio. Si el CI o el
 arranque fallan, sigue corriendo la versión anterior.
 
-- La rama vinculada hoy es `feat/EPIC-SN-01-dockerizacion-y-despliegue` (pasa a `main` al
-  integrar la épica; ver `CONTRIBUTING.md`).
+- La rama vinculada es `main`: todo cambio llega por Pull Request (ver `CONTRIBUTING.md`).
 - Los cambios solo en `docs/**` o en archivos `.md` no despliegan. Para saltear el deploy de
   otro commit, agregar `[skip render]` al mensaje.
 - HTTPS y certificado los gestiona Render. La API llega a Supabase por internet, con TLS

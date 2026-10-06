@@ -162,8 +162,8 @@ git commit -m "feat(docker): agrega docker-compose con api y postgres (HU-SN-03)
 git push
 ```
 
-Render está vinculado a esta rama mientras dure la épica: cada push con el CI en verde se
-despliega solo (sección 9).
+Durante la épica, Render estuvo vinculado a esta rama. Desde el pase a `main` (sección 8)
+despliega solo lo que se mergea en `main` con el CI en verde (sección 9).
 
 ## 8. Pase a `main` y revisión obligatoria
 

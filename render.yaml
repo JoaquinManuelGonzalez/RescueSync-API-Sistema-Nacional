@@ -21,8 +21,8 @@ services:
     # Explicito: si se omite, Render usa 0.5c-512mb, que es pago.
     plan: free
     region: virginia
-    # Rama de la epica mientras dure; pasa a main cuando se integre (CONTRIBUTING.md seccion 8).
-    branch: feat/EPIC-SN-01-dockerizacion-y-despliegue
+    # Solo main despliega: todo cambio llega por Pull Request (CONTRIBUTING.md seccion 8).
+    branch: main
     dockerfilePath: ./Dockerfile
     dockerContext: .
     # Solo despliega un commit si pasan TODOS los checks de GitHub Actions (.github/workflows).
