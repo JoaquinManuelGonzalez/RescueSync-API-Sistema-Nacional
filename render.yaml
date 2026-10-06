@@ -1,0 +1,58 @@
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
+# Render Blueprint de la API del Sistema Nacional (infraestructura como codigo).
+#
+# Crea y mantiene el web service construido desde el Dockerfile. Toda la infraestructura de
+# Render se cambia editando ESTE archivo: un cambio hecho a mano en el dashboard que lo
+# contradiga se pisa en el siguiente sync.
+#
+# La base PostgreSQL NO vive en Render: es un proyecto de Supabase (plan Free), que no expira
+# como la Render Postgres Free. Se configura desde el dashboard de Supabase (ver README).
+#
+# Referencia de campos: https://render.com/docs/blueprint-spec
+# Decision y limites del plan Free: docs/adr/ADR-002-plataforma-cloud-render.md
+# Base de datos en Supabase: docs/adr/ADR-004-base-de-datos-supabase.md
+#
+# NO contiene secretos: SECRET_KEY la genera Render y DATABASE_URL se carga en el dashboard.
+
+services:
+  - type: web
+    name: rescuesync-sistema-nacional
+    runtime: docker
+    # Explicito: si se omite, Render usa 0.5c-512mb, que es pago.
+    plan: free
+    region: virginia
+    # Solo main despliega: todo cambio llega por Pull Request (CONTRIBUTING.md seccion 8).
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # Solo despliega un commit si pasan TODOS los checks de GitHub Actions (.github/workflows).
+    autoDeployTrigger: checksPass
+    # Health check HTTP: decide cuando un deploy nuevo recibe trafico y reinicia la instancia
+    # si deja de responder 2xx en menos de 5 segundos.
+    healthCheckPath: /health
+    # Cambios solo de documentacion no disparan build ni deploy.
+    buildFilter:
+      ignoredPaths:
+        - docs/**
+        - "**/*.md"
+    envVars:
+      # URI del "Session pooler" de Supabase (boton Connect del proyecto). No la conexion
+      # directa: esa es solo IPv6 y Render solo sale por IPv4. Formato:
+      #   postgresql://postgres.<ref>:<clave>@aws-<n>-us-east-1.pooler.supabase.com:5432/postgres
+      # Es un secreto: se carga en Service -> Environment del dashboard de Render.
+      - key: DATABASE_URL
+        sync: false
+      # La conexion a Supabase viaja por internet; "require" impide que caiga a texto plano.
+      - key: DATABASE_SSLMODE
+        value: require
+      - key: SECRET_KEY
+        generateValue: true
+      - key: APP_ENV
+        value: produccion
+      - key: LOG_LEVEL
+        value: INFO
+      # Secretos futuros (credenciales de Bonita, claves JWT) se declaran asi, sin valor:
+      #   - key: NOMBRE_DEL_SECRETO
+      #     sync: false
+      # Render los pide SOLO al crear el Blueprint; si se agregan despues, se cargan a mano en
+      # Service -> Environment del dashboard.

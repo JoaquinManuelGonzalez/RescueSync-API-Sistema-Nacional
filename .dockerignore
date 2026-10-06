@@ -1,0 +1,22 @@
+# Contexto de build de la imagen (local, CI y Render respetan este archivo).
+.git/
+.github/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.uv-cache/
+
+# Secretos: nunca entran a la imagen.
+.env
+.env.*
+!.env.example
+
+# No hacen falta para ejecutar la API.
+tests/
+docs/
+render.yaml
+docker-compose.yml
+*.md

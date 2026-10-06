@@ -1,0 +1,46 @@
+[project]
+name = "rescuesync-sistema-nacional"
+version = "0.1.0"
+description = "API del Sistema Nacional de RescueSync: habilitacion de ONGs y compromiso de recursos."
+requires-python = "==3.14.*"
+
+dependencies = [
+    "Flask==3.1.3",
+    "Flask-SQLAlchemy==3.1.1",
+    "Flask-Migrate==4.1.0",
+    "SQLAlchemy==2.0.54",
+    "alembic==1.20.0",
+    "psycopg[binary]==3.3.5",
+    "gunicorn==26.2.0",
+    "python-dotenv==1.2.3",
+]
+
+[dependency-groups]
+dev = [
+    "ruff==0.16.7",
+    "pytest==9.1.1",
+]
+
+[tool.uv]
+# La aplicacion se ejecuta desde el working directory, no se instala como paquete.
+package = false
+
+# Configuracion de Ruff fijada en CONTRIBUTING.md seccion 4 (heredada de la aplicacion web).
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# Los archivos de migrations/ los genera Alembic con su propia plantilla y su nombre empieza
+# con un numero de revision.
+"migrations/*" = ["F401", "E501", "N999", "I001", "UP035"]
+# Las excepciones del proyecto llevan la palabra adelante: ErrorDeAplicacion, no AplicacionError.
+"app/core/errores.py" = ["N818"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# El proyecto no se instala como paquete: la raiz tiene que estar en el path para importar app.
+pythonpath = ["."]

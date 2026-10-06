@@ -1,0 +1,73 @@
+# Entorno local de la API del Sistema Nacional.
+#
+#   cp .env.example .env         una sola vez
+#   docker compose up -d --build levanta db + api (la primera vez, o al cambiar dependencias)
+#   docker compose logs -f api   logs JSON de la API
+#   docker compose down          detiene (los datos quedan en el volumen datos_postgres)
+#
+# Herramientas opcionales:
+#   docker compose --profile herramientas up -d   agrega Adminer en http://localhost:8081
+#
+# Bonita y la aplicacion web quedan FUERA de este archivo: son componentes con su propio ciclo
+# de vida. Los puertos de host (8000 y 5433) estan elegidos para no chocar con los de la
+# aplicacion web (5000 y 5432), asi los dos stacks pueden correr a la vez.
+name: rescuesync-sistema-nacional
+
+services:
+  db:
+    # Mismo major que el PostgreSQL del proyecto de Supabase (ADR-004). Si Supabase lo
+    # actualiza, se cambia aca y cada integrante recrea su base con `docker compose down -v`.
+    image: postgres:17-trixie
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-sistema_nacional}
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      # Directorio de datos de la imagen oficial hasta PostgreSQL 17.
+      - datos_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      target: desarrollo
+    env_file:
+      - .env
+    ports:
+      - "${PORT:-8000}:${PORT:-8000}"
+    volumes:
+      # Codigo montado: flask run --debug recarga ante cada cambio, sin reconstruir la imagen.
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "/app/healthcheck.py"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    # Sin reinicio automatico: si la configuracion es invalida (fail-fast) o una migracion
+    # falla, el contenedor tiene que quedar detenido y visible en `docker compose ps`.
+    restart: "no"
+
+  adminer:
+    image: adminer:5
+    profiles: ["herramientas"]
+    ports:
+      - "${ADMINER_HOST_PORT:-8081}:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    depends_on:
+      - db
+
+volumes:
+  datos_postgres:

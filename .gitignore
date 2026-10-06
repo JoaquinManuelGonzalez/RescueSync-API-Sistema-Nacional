@@ -218,3 +218,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- RescueSync: secretos y variables de entorno ---
+# Ningun archivo de entorno real se versiona; solo la plantilla .env.example.
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+secrets/
+
+# Cache de uv dentro del repo (por ejemplo, si se usa UV_CACHE_DIR=.uv-cache)
+.uv-cache/
