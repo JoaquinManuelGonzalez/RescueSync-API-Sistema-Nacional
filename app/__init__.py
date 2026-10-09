@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from flask import Flask
+from flask_smorest import Api
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.core.configuracion import construir_configuracion, validar_o_terminar
@@ -39,6 +40,30 @@ def create_app(overrides: dict[str, Any] | None = None) -> Flask:
         # toma el esquema y la IP real de las cabeceras X-Forwarded-* que agrega ese unico
         # proxy, para que request.scheme sea "https" y los logs muestren la IP del cliente.
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+    # Configuración de la API
+    app.config.update(
+        API_TITLE="Sistema Nacional de Gestión de Recursos y Riesgos",
+        API_VERSION="v0.1.0",
+        OPENAPI_VERSION="3.1.0",
+        OPENAPI_URL_PREFIX="/",
+        OPENAPI_SWAGGER_UI_PATH="/docs",
+        OPENAPI_SWAGGER_UI_URL="https://cdn.jsdelivr.net/npm/swagger-ui-dist/",
+    )
+
+    # Crea la API
+    api = Api(app)
+
+    # Hace aparecer un botón "Authorize" en Swagger UI
+    # Falta implementar
+    api.spec.components.security_scheme(
+        "bearerAuth",
+        {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+        },
+    )
 
     db.init_app(app)
     migrate.init_app(app, db)
