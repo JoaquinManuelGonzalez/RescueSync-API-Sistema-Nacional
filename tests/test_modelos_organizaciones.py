@@ -67,8 +67,7 @@ def test_organizacion_puede_tener_multiples_certificaciones(base_de_datos):
         "IRAM 3546",
     ]
     assert all(
-        certificacion.organizacion is organizacion
-        for certificacion in organizacion.certificaciones
+        certificacion.organizacion is organizacion for certificacion in organizacion.certificaciones
     )
 
 

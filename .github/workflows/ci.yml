@@ -79,9 +79,7 @@ jobs:
       - name: Smoke test del entorno local
         run: |
           curl --fail --silent --show-error localhost:8000/health
-          docker compose exec -T db sh -c \
-            'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "select version_num from alembic_version"' \
-            | grep -qx 0001
+          docker compose exec -T api flask db current | grep -q "(head)"
 
       # La misma imagen que construye Render: target por defecto (produccion), PORT=10000.
       - name: Construir la imagen de produccion
