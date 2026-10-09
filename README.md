@@ -133,8 +133,9 @@ app/                    código de la API
   wsgi.py               objeto que levantan flask y gunicorn (app.wsgi:app)
   extensiones.py        db y migrate
   core/                 configuracion, errores, logging, salud (/health)
-  modulos/              módulos de dominio (los agregan las épicas siguientes)
-migrations/             migraciones de Alembic (0001: línea base sin tablas)
+  modulos/              módulos de dominio (organizaciones e inventarios iniciales)
+migrations/             migraciones de Alembic (0001: línea base;
+                        f5b04d297d15: organizaciones e inventarios)
 tests/                  tests con pytest (SQLite en memoria)
 docs/adr/               decisiones de arquitectura
 docs/contratos/         contratos de configuración, errores y logging
