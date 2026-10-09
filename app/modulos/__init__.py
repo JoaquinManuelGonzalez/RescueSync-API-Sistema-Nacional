@@ -8,11 +8,10 @@ la aplicacion y a Alembic. Por ahora no hay ninguno: los agregan las epicas sigu
 from __future__ import annotations
 
 from flask import Flask
-
 from flask_smorest import Api
 
 
-def registrar_modulos(app: Flask, api:Api) -> None:  # noqa: ARG001
+def registrar_modulos(app: Flask, api: Api) -> None:  # noqa: ARG001
     """Registra el blueprint de cada modulo de dominio.
 
     Ejemplo, cuando exista el modulo de compromisos:
