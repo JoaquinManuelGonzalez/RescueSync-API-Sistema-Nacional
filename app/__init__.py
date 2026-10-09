@@ -74,6 +74,6 @@ def create_app(overrides: dict[str, Any] | None = None) -> Flask:
     app.register_blueprint(blueprint_salud)
 
     # Los modulos de dominio se registran al final, ya con la configuracion validada.
-    registrar_modulos(app)
+    registrar_modulos(app, api)
 
     return app
