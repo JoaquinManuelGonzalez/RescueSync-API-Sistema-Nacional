@@ -90,6 +90,30 @@ class Organizacion(db.Model):
         cascade="all, delete-orphan",
         uselist=False,
     )
+    certificaciones: Mapped[list[Certificacion]] = relationship(
+        back_populates="organizacion",
+        cascade="all, delete-orphan",
+    )
+
+
+class Certificacion(db.Model):
+    """Certificación que acredita las capacidades de una organización."""
+
+    __tablename__ = "certificaciones"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organizacion_id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        ForeignKey("organizaciones.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    nombre: Mapped[str] = mapped_column(String(200), nullable=False)
+    tipo: Mapped[TipoItem] = mapped_column(
+        Enum(TipoItem, name="tipo_certificacion_enum"),
+        nullable=False,
+    )
+
+    organizacion: Mapped[Organizacion] = relationship(back_populates="certificaciones")
 
 
 class Item(db.Model):

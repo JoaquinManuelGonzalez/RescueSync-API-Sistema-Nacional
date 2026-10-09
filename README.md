@@ -177,6 +177,7 @@ docker compose down -v                  # detener y BORRAR la base local
 
 docker compose exec api flask db upgrade                 # aplicar migraciones a mano
 docker compose exec api flask db migrate -m "mensaje"    # generar una migración
+docker compose exec api flask seed                       # cargar datos semilla idempotentes
 docker compose exec api pytest                           # tests dentro del contenedor
 docker compose exec api ruff check .                     # linter dentro del contenedor
 

@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.extensiones import db
 from app.modulos.organizaciones.modelos import (
+    Certificacion,
     Inventario,
     InventarioItem,
     Item,
@@ -47,6 +48,43 @@ def test_organizacion_puede_tener_inventario_con_items(base_de_datos):
     assert organizacion.inventario is not None
     assert organizacion.inventario.items[0].item.tipo is TipoItem.agua
     assert organizacion.inventario.items[0].cantidad_disponible == 750
+
+
+def test_organizacion_puede_tener_multiples_certificaciones(base_de_datos):
+    organizacion = Organizacion(
+        nombre="Rescate Solidario",
+        email_contacto="contacto@rescate.example",
+        certificaciones=[
+            Certificacion(nombre="ISO 9001", tipo=TipoItem.otro),
+            Certificacion(nombre="IRAM 3546", tipo=TipoItem.rescate),
+        ],
+    )
+    db.session.add(organizacion)
+    db.session.commit()
+
+    assert [certificacion.nombre for certificacion in organizacion.certificaciones] == [
+        "ISO 9001",
+        "IRAM 3546",
+    ]
+    assert all(
+        certificacion.organizacion is organizacion
+        for certificacion in organizacion.certificaciones
+    )
+
+
+def test_al_eliminar_una_organizacion_se_eliminan_sus_certificaciones(base_de_datos):
+    organizacion = Organizacion(
+        nombre="Rescate Solidario",
+        email_contacto="contacto@rescate.example",
+        certificaciones=[Certificacion(nombre="ISO 9001", tipo=TipoItem.otro)],
+    )
+    db.session.add(organizacion)
+    db.session.commit()
+
+    db.session.delete(organizacion)
+    db.session.commit()
+
+    assert db.session.query(Certificacion).count() == 0
 
 
 @pytest.mark.parametrize(

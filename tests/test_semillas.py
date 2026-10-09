@@ -1,0 +1,74 @@
+from __future__ import annotations
+
+import pytest
+
+from app.extensiones import db
+from app.modulos.organizaciones import semillas
+from app.modulos.organizaciones.modelos import (
+    Certificacion,
+    InventarioItem,
+    Item,
+    Organizacion,
+    TipoItem,
+)
+
+
+@pytest.fixture
+def base_de_datos(app):
+    with app.app_context():
+        db.create_all()
+        yield
+        db.session.remove()
+        db.drop_all()
+
+
+def test_sembrar_carga_datos_y_es_idempotente(base_de_datos):
+    from app.core.semillas import SEEDERS, importar_seeders
+
+    importar_seeders()
+    primera_carga = [resultado for seeder in SEEDERS for resultado in seeder.funcion()]
+    db.session.commit()
+    segunda_carga = [resultado for seeder in SEEDERS for resultado in seeder.funcion()]
+    db.session.commit()
+
+    assert primera_carga[0].creados == len(semillas.ORGANIZACIONES_DE_DEMOSTRACION)
+    assert sum(resultado.creados for resultado in primera_carga) > 0
+    assert sum(resultado.creados for resultado in segunda_carga) == 0
+    assert db.session.query(Organizacion).count() == len(semillas.ORGANIZACIONES_DE_DEMOSTRACION)
+    assert db.session.query(Item).count() == len(semillas.ITEMS)
+    assert db.session.query(Certificacion).count() == sum(
+        len(certificaciones) for certificaciones in semillas.CERTIFICACIONES.values()
+    )
+
+
+def test_tipos_de_certificacion_son_categorias_de_items(base_de_datos):
+    from app.core.semillas import SEEDERS, importar_seeders
+
+    importar_seeders()
+    for seeder in SEEDERS:
+        seeder.funcion()
+    db.session.commit()
+
+    tipos_de_items = {item.tipo for item in db.session.query(Item).all()}
+    tipos_de_certificaciones = {
+        certificacion.tipo for certificacion in db.session.query(Certificacion).all()
+    }
+
+    assert tipos_de_certificaciones <= set(TipoItem)
+    assert tipos_de_certificaciones <= tipos_de_items
+    assert db.session.query(InventarioItem).count() > 0
+
+
+def test_comando_flask_seed_carga_los_datos(app):
+    with app.app_context():
+        db.create_all()
+        resultado = app.test_cli_runner().invoke(args=["seed"])
+
+        assert resultado.exit_code == 0, resultado.output
+        assert "organizaciones/organizaciones:" in resultado.output
+        assert db.session.query(Organizacion).count() == len(
+            semillas.ORGANIZACIONES_DE_DEMOSTRACION
+        )
+
+        db.session.remove()
+        db.drop_all()
