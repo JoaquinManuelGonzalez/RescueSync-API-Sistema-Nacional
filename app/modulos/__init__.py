@@ -8,9 +8,12 @@ la aplicacion y a Alembic. Por ahora no hay ninguno: los agregan las epicas sigu
 from __future__ import annotations
 
 from flask import Flask
+from flask_smorest import Api
+
+from app.modulos.autenticacion.rutas import blueprint_autenticacion
 
 
-def registrar_modulos(app: Flask) -> None:  # noqa: ARG001
+def registrar_modulos(app: Flask, api: Api) -> None:  # noqa: ARG001
     """Registra el blueprint de cada modulo de dominio.
 
     Ejemplo, cuando exista el modulo de compromisos:
@@ -18,7 +21,13 @@ def registrar_modulos(app: Flask) -> None:  # noqa: ARG001
         from app.modulos.compromisos.rutas import blueprint_compromisos
 
         app.register_blueprint(blueprint_compromisos)
+
+        Importante: Para registrar el Blueprint de flask-smorest
+        usar api.register_blueprint, NO app.register_blueprint.
+        La api en sí se crea en create_app, el constructor de la misma se pasa como parámetro.
     """
+
+    api.register_blueprint(blueprint_autenticacion)
 
 
 def importar_modelos() -> None:

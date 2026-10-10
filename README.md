@@ -124,6 +124,8 @@ uv run flask --app app.wsgi:app run --debug --port 8000
 | pytest (dev) | 9.1.1 | `pyproject.toml` / `uv.lock` |
 | Render (PaaS) | plan Free | `render.yaml` |
 | Supabase (base de datos) | plan Free, `us-east-1` | dashboard de Supabase (ADR-004) |
+| marshmallow | 4.3.1 | `pyproject.toml` / `uv.lock` |
+| flask-smorest | 0.47.0 | `pyproject.toml` / `uv.lock` |
 
 ## Mapa del repositorio
 
