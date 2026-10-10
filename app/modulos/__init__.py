@@ -30,3 +30,4 @@ def importar_modelos() -> None:
 
         import app.modulos.compromisos.modelos  # noqa: F401
     """
+    import app.modulos.organizaciones.modelos  # noqa: F401
