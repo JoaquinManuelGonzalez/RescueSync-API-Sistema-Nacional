@@ -135,8 +135,11 @@ app/                    código de la API
   wsgi.py               objeto que levantan flask y gunicorn (app.wsgi:app)
   extensiones.py        db y migrate
   core/                 configuracion, errores, logging, salud (/health)
-  modulos/              módulos de dominio (los agregan las épicas siguientes)
-migrations/             migraciones de Alembic (0001: línea base sin tablas)
+  modulos/              módulos de dominio (organizaciones e inventarios iniciales)
+migrations/             migraciones de Alembic (0001: línea base;
+                        f5b04d297d15: organizaciones e inventarios;
+                        c7a8f1d2e3b4: certificaciones;
+                        d026ce7dc122: compromisos de recursos)
 tests/                  tests con pytest (SQLite en memoria)
 docs/adr/               decisiones de arquitectura
 docs/contratos/         contratos de configuración, errores y logging
@@ -178,6 +181,7 @@ docker compose down -v                  # detener y BORRAR la base local
 
 docker compose exec api flask db upgrade                 # aplicar migraciones a mano
 docker compose exec api flask db migrate -m "mensaje"    # generar una migración
+docker compose exec api flask seed                       # cargar datos semilla idempotentes
 docker compose exec api pytest                           # tests dentro del contenedor
 docker compose exec api ruff check .                     # linter dentro del contenedor
 

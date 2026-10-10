@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import click
 from flask import Flask
 from flask_smorest import Api
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -75,5 +76,28 @@ def create_app(overrides: dict[str, Any] | None = None) -> Flask:
 
     # Los modulos de dominio se registran al final, ya con la configuracion validada.
     registrar_modulos(app, api)
+    _registrar_comando_seed(app)
 
     return app
+
+
+def _registrar_comando_seed(app: Flask) -> None:
+    """Registra `flask seed`, que ejecuta todos los seeders en una transacción."""
+
+    @app.cli.command("seed")
+    def seed() -> None:
+        from app.core.semillas import SEEDERS, importar_seeders
+
+        importar_seeders()
+        try:
+            with db.session.begin():
+                for seeder in SEEDERS:
+                    for resultado in seeder.funcion():
+                        click.echo(
+                            f"{seeder.nombre}/{resultado.entidad}: "
+                            f"{resultado.creados} creados, "
+                            f"{resultado.existentes} existentes"
+                        )
+        except Exception:
+            db.session.rollback()
+            raise
