@@ -61,10 +61,16 @@ class EstadoCompromiso(enum.Enum):
 
 
 class TipoAsignacion(enum.Enum):
-    """Uso de la capacidad validada para la organización en una emergencia."""
+    """
+    Uso de la capacidad validada para la organización en una emergencia.
+    Pendiente: Aún no fue revisada por el Sistema Nacional.
+    Rechazada: Fue rechazada completamente por el Sistema Nacional.
+    """
 
+    pendiente = "pendiente"
     principal = "principal"
     apoyo = "apoyo"
+    rechazada = "rechazada"
 
 
 class Organizacion(db.Model):
@@ -154,6 +160,9 @@ class Item(db.Model):
     )
     unidad_medida: Mapped[str] = mapped_column(String(50), nullable=False)
     descripcion: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    consumible: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
 
     inventario_items: Mapped[list[InventarioItem]] = relationship(
         back_populates="item",
@@ -193,12 +202,7 @@ class InventarioItem(db.Model):
     __tablename__ = "inventario_items"
     __table_args__ = (
         UniqueConstraint("inventario_id", "item_id"),
-        CheckConstraint("cantidad_total >= 0", name="cantidad_total_no_negativa"),
         CheckConstraint("cantidad_disponible >= 0", name="cantidad_disponible_no_negativa"),
-        CheckConstraint(
-            "cantidad_disponible <= cantidad_total",
-            name="cantidad_disponible_no_supera_total",
-        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -212,7 +216,6 @@ class InventarioItem(db.Model):
         ForeignKey("items.id"),
         nullable=False,
     )
-    cantidad_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     cantidad_disponible: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     inventario: Mapped[Inventario] = relationship(back_populates="items")
