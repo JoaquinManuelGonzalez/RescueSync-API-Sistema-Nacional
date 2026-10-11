@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from secrets import token_urlsafe
+
+from werkzeug.security import generate_password_hash
+
 from app.core.semillas import ResultadoSemilla, obtener_o_crear, registrar
 from app.modulos.organizaciones.modelos import (
     Certificacion,
@@ -9,6 +14,7 @@ from app.modulos.organizaciones.modelos import (
     InventarioItem,
     Item,
     Organizacion,
+    OrganizacionCertificacion,
     TipoItem,
     TipoOrganizacion,
 )
@@ -167,7 +173,8 @@ def sembrar_organizaciones() -> list[ResultadoSemilla]:
             claves={"nombre": nombre},
             valores={
                 "tipo": tipo,
-                "email_contacto": f"semillas+{identificador.replace('-', '')}@rescuesync.example",
+                "mail_contacto": f"semillas+{identificador.replace('-', '')}@rescuesync.example",
+                "password_hash": generate_password_hash(token_urlsafe(32)),
                 "identificador_nacional": identificador,
             },
         )
@@ -194,12 +201,22 @@ def sembrar_certificaciones() -> list[ResultadoSemilla]:
     for nombre_org, certificaciones in CERTIFICACIONES.items():
         organizacion = Organizacion.query.filter_by(nombre=nombre_org).one()
         for nombre, tipo in certificaciones:
-            _, creado = obtener_o_crear(
+            certificacion, creada = obtener_o_crear(
                 Certificacion,
-                claves={"organizacion_id": organizacion.id, "nombre": nombre},
-                valores={"tipo": tipo},
+                claves={"nombre": nombre, "tipo": tipo},
             )
-            resultado.contar(creado)
+            _, asignada = obtener_o_crear(
+                OrganizacionCertificacion,
+                claves={
+                    "organizacion_id": organizacion.id,
+                    "certificacion_id": certificacion.id,
+                },
+                valores={
+                    "nivel_riesgo_permitido": "ALTO",
+                    "fecha_emision": datetime.now(UTC),
+                },
+            )
+            resultado.contar(creada or asignada)
     return [resultado]
 
 

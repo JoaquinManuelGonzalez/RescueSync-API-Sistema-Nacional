@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 from sqlalchemy.exc import IntegrityError
 
@@ -14,8 +16,10 @@ from app.modulos.organizaciones.modelos import (
     Item,
     NivelGravedad,
     Organizacion,
+    OrganizacionCertificacion,
     TipoAsignacion,
     TipoItem,
+    TipoOrganizacion,
 )
 
 
@@ -28,11 +32,19 @@ def base_de_datos(app):
         db.drop_all()
 
 
+def crear_organizacion(**valores):
+    datos = {
+        "tipo": TipoOrganizacion.ong,
+        "nombre": "Rescate Solidario",
+        "mail_contacto": "contacto@rescate.example",
+        "password_hash": "hash-de-prueba",
+    }
+    datos.update(valores)
+    return Organizacion(**datos)
+
+
 def test_organizacion_puede_tener_inventario_con_items(base_de_datos):
-    organizacion = Organizacion(
-        nombre="Rescate Solidario",
-        email_contacto="contacto@rescate.example",
-    )
+    organizacion = crear_organizacion()
     item = Item(
         nombre="Agua potable",
         tipo=TipoItem.agua,
@@ -55,31 +67,44 @@ def test_organizacion_puede_tener_inventario_con_items(base_de_datos):
 
 
 def test_organizacion_puede_tener_multiples_certificaciones(base_de_datos):
-    organizacion = Organizacion(
-        nombre="Rescate Solidario",
-        email_contacto="contacto@rescate.example",
+    certificaciones = [
+        Certificacion(nombre="ISO 9001", tipo=TipoItem.otro),
+        Certificacion(nombre="IRAM 3546", tipo=TipoItem.rescate),
+    ]
+    organizacion = crear_organizacion(
         certificaciones=[
-            Certificacion(nombre="ISO 9001", tipo=TipoItem.otro),
-            Certificacion(nombre="IRAM 3546", tipo=TipoItem.rescate),
-        ],
+            OrganizacionCertificacion(
+                certificacion=certificacion,
+                nivel_riesgo_permitido="ALTO",
+                fecha_emision=datetime.now(UTC),
+            )
+            for certificacion in certificaciones
+        ]
     )
     db.session.add(organizacion)
     db.session.commit()
 
-    assert [certificacion.nombre for certificacion in organizacion.certificaciones] == [
+    assert [
+        asignacion.certificacion.nombre for asignacion in organizacion.certificaciones
+    ] == [
         "ISO 9001",
         "IRAM 3546",
     ]
     assert all(
-        certificacion.organizacion is organizacion for certificacion in organizacion.certificaciones
+        asignacion.organizacion is organizacion for asignacion in organizacion.certificaciones
     )
 
 
 def test_al_eliminar_una_organizacion_se_eliminan_sus_certificaciones(base_de_datos):
-    organizacion = Organizacion(
-        nombre="Rescate Solidario",
-        email_contacto="contacto@rescate.example",
-        certificaciones=[Certificacion(nombre="ISO 9001", tipo=TipoItem.otro)],
+    certificacion = Certificacion(nombre="ISO 9001", tipo=TipoItem.otro)
+    organizacion = crear_organizacion(
+        certificaciones=[
+            OrganizacionCertificacion(
+                certificacion=certificacion,
+                nivel_riesgo_permitido="ALTO",
+                fecha_emision=datetime.now(UTC),
+            )
+        ]
     )
     db.session.add(organizacion)
     db.session.commit()
@@ -87,14 +112,12 @@ def test_al_eliminar_una_organizacion_se_eliminan_sus_certificaciones(base_de_da
     db.session.delete(organizacion)
     db.session.commit()
 
-    assert db.session.query(Certificacion).count() == 0
+    assert db.session.query(OrganizacionCertificacion).count() == 0
+    assert db.session.query(Certificacion).count() == 1
 
 
 def test_compromiso_registra_recursos_de_una_emergencia_externa(base_de_datos):
-    organizacion = Organizacion(
-        nombre="Rescate Solidario",
-        email_contacto="contacto@rescate.example",
-    )
+    organizacion = crear_organizacion()
     inventario_item = InventarioItem(
         item=Item(
             nombre="Agua potable",
@@ -133,9 +156,7 @@ def test_compromiso_rechaza_cantidad_no_positiva(base_de_datos):
         cantidad_disponible=1000,
     )
     compromiso = Compromiso(
-        organizacion=Organizacion(
-            nombre="Rescate Solidario",
-            email_contacto="contacto@rescate.example",
+        organizacion=crear_organizacion(
             inventario=Inventario(items=[inventario_item]),
         ),
         emergencia_externa_id="bonita-case-123",
@@ -149,6 +170,34 @@ def test_compromiso_rechaza_cantidad_no_positiva(base_de_datos):
         ],
     )
     db.session.add(compromiso)
+
+    with pytest.raises(IntegrityError):
+        db.session.commit()
+
+    db.session.rollback()
+@pytest.mark.parametrize(
+    "cantidad_disponible",
+    [-1],
+)
+def test_inventario_rechaza_cantidades_invalidas(
+    base_de_datos,
+    cantidad_disponible,
+):
+    organizacion = crear_organizacion(
+        inventario=Inventario(
+            items=[
+                InventarioItem(
+                    item=Item(
+                        nombre="Agua potable",
+                        tipo=TipoItem.agua,
+                        unidad_medida="litros",
+                    ),
+                    cantidad_disponible=cantidad_disponible,
+                )
+            ]
+        ),
+    )
+    db.session.add(organizacion)
 
     with pytest.raises(IntegrityError):
         db.session.commit()
