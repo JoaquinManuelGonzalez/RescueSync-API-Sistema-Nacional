@@ -62,9 +62,9 @@ class EstadoCompromiso(enum.Enum):
 
 class TipoAsignacion(enum.Enum):
     """
-        Uso de la capacidad validada para la organización en una emergencia.
-        Pendiente: Aún no fue revisada por el Sistema Nacional.
-        Rechazada: Fue rechazada completamente por el Sistema Nacional.
+    Uso de la capacidad validada para la organización en una emergencia.
+    Pendiente: Aún no fue revisada por el Sistema Nacional.
+    Rechazada: Fue rechazada completamente por el Sistema Nacional.
     """
 
     pendiente = "pendiente"
@@ -161,10 +161,7 @@ class Item(db.Model):
     unidad_medida: Mapped[str] = mapped_column(String(50), nullable=False)
     descripcion: Mapped[str | None] = mapped_column(String(255), nullable=True)
     consumible: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-        default=True,
-        server_default=text("true")
+        Boolean, nullable=False, default=True, server_default=text("true")
     )
 
     inventario_items: Mapped[list[InventarioItem]] = relationship(
