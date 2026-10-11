@@ -42,7 +42,6 @@ def test_organizacion_puede_tener_inventario_con_items(base_de_datos):
         items=[
             InventarioItem(
                 item=item,
-                cantidad_total=1000,
                 cantidad_disponible=750,
             )
         ]
@@ -102,7 +101,6 @@ def test_compromiso_registra_recursos_de_una_emergencia_externa(base_de_datos):
             tipo=TipoItem.agua,
             unidad_medida="litros",
         ),
-        cantidad_total=1000,
         cantidad_disponible=750,
     )
     organizacion.inventario = Inventario(items=[inventario_item])
@@ -132,7 +130,6 @@ def test_compromiso_registra_recursos_de_una_emergencia_externa(base_de_datos):
 def test_compromiso_rechaza_cantidad_no_positiva(base_de_datos):
     inventario_item = InventarioItem(
         item=Item(nombre="Agua potable", tipo=TipoItem.agua, unidad_medida="litros"),
-        cantidad_total=1000,
         cantidad_disponible=1000,
     )
     compromiso = Compromiso(
@@ -152,40 +149,6 @@ def test_compromiso_rechaza_cantidad_no_positiva(base_de_datos):
         ],
     )
     db.session.add(compromiso)
-
-    with pytest.raises(IntegrityError):
-        db.session.commit()
-
-    db.session.rollback()
-
-
-@pytest.mark.parametrize(
-    ("cantidad_total", "cantidad_disponible"),
-    [(-1, 0), (5, -1), (5, 6)],
-)
-def test_inventario_rechaza_cantidades_invalidas(
-    base_de_datos,
-    cantidad_total,
-    cantidad_disponible,
-):
-    organizacion = Organizacion(
-        nombre="Rescate Solidario",
-        email_contacto="contacto@rescate.example",
-        inventario=Inventario(
-            items=[
-                InventarioItem(
-                    item=Item(
-                        nombre="Agua potable",
-                        tipo=TipoItem.agua,
-                        unidad_medida="litros",
-                    ),
-                    cantidad_total=cantidad_total,
-                    cantidad_disponible=cantidad_disponible,
-                )
-            ]
-        ),
-    )
-    db.session.add(organizacion)
 
     with pytest.raises(IntegrityError):
         db.session.commit()

@@ -220,7 +220,7 @@ def sembrar_inventarios() -> list[ResultadoSemilla]:
             _, creado = obtener_o_crear(
                 InventarioItem,
                 claves={"inventario_id": inventario.id, "item_id": item.id},
-                valores={"cantidad_total": cantidad, "cantidad_disponible": cantidad},
+                valores={"cantidad_disponible": cantidad},
             )
             resultado_items.contar(creado)
     return [resultado_inventarios, resultado_items]
