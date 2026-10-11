@@ -14,6 +14,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
     UniqueConstraint,
     func,
     text,
@@ -46,18 +47,18 @@ class TipoItem(enum.Enum):
 class NivelGravedad(enum.Enum):
     """Nivel de gravedad de la emergencia al reservar recursos."""
 
-    baja = "baja"
-    media = "media"
-    alta = "alta"
-    critica = "critica"
+    baja = "BAJO"
+    media = "MEDIO"
+    alta = "ALTO"
+    critica = "CRITICO"
 
 
 class EstadoCompromiso(enum.Enum):
     """Estados posibles del compromiso de recursos."""
 
-    comprometido = "comprometido"
-    liberado = "liberado"
-    cancelado = "cancelado"
+    comprometido = "COMPROMETIDO"
+    liberado = "LIBERADO"
+    cancelado = "CANCELADO"
 
 
 class TipoAsignacion(enum.Enum):
@@ -73,6 +74,10 @@ class TipoAsignacion(enum.Enum):
     rechazada = "rechazada"
 
 
+def _valores_enum(tipo_enum: type[enum.Enum]) -> list[str]:
+    return [miembro.value for miembro in tipo_enum]
+
+
 class Organizacion(db.Model):
     """ONG u organismo de rescate registrado en el Sistema Nacional."""
 
@@ -83,16 +88,22 @@ class Organizacion(db.Model):
         primary_key=True,
     )
     tipo: Mapped[TipoOrganizacion] = mapped_column(
-        Enum(TipoOrganizacion, name="tipo_organizacion_enum"),
+        Enum(
+            TipoOrganizacion,
+            name="tipo_organizacion_enum",
+            native_enum=False,
+            create_constraint=False,
+            length=255,
+            values_callable=_valores_enum,
+        ),
         nullable=False,
-        default=TipoOrganizacion.ong,
-        server_default=TipoOrganizacion.ong.value,
     )
-    nombre: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
-    email_contacto: Mapped[str] = mapped_column(String(254), nullable=False, unique=True)
-    telefono_contacto: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    nombre: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    mail_contacto: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    telefono_contacto: Mapped[str | None] = mapped_column(Text, nullable=True)
     identificador_nacional: Mapped[str | None] = mapped_column(
-        String(50),
+        Text,
         nullable=True,
         unique=True,
         comment="CUIT u otro identificador oficial.",
@@ -103,12 +114,12 @@ class Organizacion(db.Model):
         default=True,
         server_default=text("true"),
     )
-    creada_en: Mapped[datetime] = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
     )
-    actualizada_en: Mapped[datetime] = mapped_column(
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
@@ -120,7 +131,7 @@ class Organizacion(db.Model):
         cascade="all, delete-orphan",
         uselist=False,
     )
-    certificaciones: Mapped[list[Certificacion]] = relationship(
+    certificaciones: Mapped[list[OrganizacionCertificacion]] = relationship(
         back_populates="organizacion",
         cascade="all, delete-orphan",
     )
@@ -128,23 +139,28 @@ class Organizacion(db.Model):
 
 
 class Certificacion(db.Model):
-    """Certificación que acredita las capacidades de una organización."""
+    """Catálogo de certificaciones del Sistema Nacional."""
 
     __tablename__ = "certificaciones"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    organizacion_id: Mapped[int] = mapped_column(
-        BigInteger().with_variant(Integer, "sqlite"),
-        ForeignKey("organizaciones.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    nombre: Mapped[str] = mapped_column(String(200), nullable=False)
+    nombre: Mapped[str] = mapped_column(String(255), nullable=False)
     tipo: Mapped[TipoItem] = mapped_column(
-        Enum(TipoItem, name="tipo_certificacion_enum"),
+        Enum(
+            TipoItem,
+            name="tipo_certificacion_enum",
+            native_enum=False,
+            create_constraint=False,
+            length=255,
+            values_callable=_valores_enum,
+        ),
         nullable=False,
     )
 
-    organizacion: Mapped[Organizacion] = relationship(back_populates="certificaciones")
+    organizaciones: Mapped[list[OrganizacionCertificacion]] = relationship(
+        back_populates="certificacion",
+        cascade="all, delete-orphan",
+    )
 
 
 class Item(db.Model):
@@ -153,15 +169,25 @@ class Item(db.Model):
     __tablename__ = "items"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    nombre: Mapped[str] = mapped_column(String(150), nullable=False, unique=True)
+    nombre: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     tipo: Mapped[TipoItem] = mapped_column(
-        Enum(TipoItem, name="tipo_item_enum"),
+        Enum(
+            TipoItem,
+            name="tipo_item_enum",
+            native_enum=False,
+            create_constraint=False,
+            length=255,
+            values_callable=_valores_enum,
+        ),
         nullable=False,
     )
     unidad_medida: Mapped[str] = mapped_column(String(50), nullable=False)
     descripcion: Mapped[str | None] = mapped_column(String(255), nullable=True)
     consumible: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=True, server_default=text("true")
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("true"),
     )
 
     inventario_items: Mapped[list[InventarioItem]] = relationship(
@@ -177,12 +203,14 @@ class Inventario(db.Model):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     organizacion_id: Mapped[int] = mapped_column(
+        "id_organizacion",
         BigInteger().with_variant(Integer, "sqlite"),
         ForeignKey("organizaciones.id", ondelete="CASCADE"),
         nullable=False,
         unique=True,
     )
     actualizado_en: Mapped[datetime] = mapped_column(
+        "updated_at",
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
@@ -197,21 +225,27 @@ class Inventario(db.Model):
 
 
 class InventarioItem(db.Model):
-    """Existencias totales y disponibles de un ítem en un inventario."""
+    """Disponibilidad de un ítem dentro de un inventario."""
 
     __tablename__ = "inventario_items"
     __table_args__ = (
-        UniqueConstraint("inventario_id", "item_id"),
+        UniqueConstraint(
+            "id_inventario",
+            "id_item",
+            name="uq_invitem_inv_item",
+        ),
         CheckConstraint("cantidad_disponible >= 0", name="cantidad_disponible_no_negativa"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     inventario_id: Mapped[int] = mapped_column(
+        "id_inventario",
         Integer,
         ForeignKey("inventarios.id", ondelete="CASCADE"),
         nullable=False,
     )
     item_id: Mapped[int] = mapped_column(
+        "id_item",
         Integer,
         ForeignKey("items.id"),
         nullable=False,
@@ -223,34 +257,87 @@ class InventarioItem(db.Model):
     compromisos: Mapped[list[CompromisoItem]] = relationship(back_populates="inventario_item")
 
 
+class OrganizacionCertificacion(db.Model):
+    """Certificación asignada a una organización, con riesgo y vigencia."""
+
+    __tablename__ = "organizacion_certificaciones"
+    __table_args__ = (
+        UniqueConstraint(
+            "id_organizacion",
+            "id_certificacion",
+            name="uq_orgcert_org_cert",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organizacion_id: Mapped[int] = mapped_column(
+        "id_organizacion",
+        BigInteger().with_variant(Integer, "sqlite"),
+        ForeignKey("organizaciones.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    certificacion_id: Mapped[int] = mapped_column(
+        "id_certificacion",
+        Integer,
+        ForeignKey("certificaciones.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    nivel_riesgo_permitido: Mapped[str] = mapped_column(String(50), nullable=False)
+    fecha_emision: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    fecha_vencimiento: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    organizacion: Mapped[Organizacion] = relationship(back_populates="certificaciones")
+    certificacion: Mapped[Certificacion] = relationship(back_populates="organizaciones")
+
+
 class Compromiso(db.Model):
     """Reserva de recursos de una organización para una emergencia externa."""
 
     __tablename__ = "compromisos"
     __table_args__ = (
         UniqueConstraint(
-            "emergencia_externa_id",
-            "organizacion_id",
+            "id_emergencia_externa",
+            "id_organizacion",
+            name="uq_compromiso_org_emergencia",
         ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     organizacion_id: Mapped[int] = mapped_column(
+        "id_organizacion",
         BigInteger().with_variant(Integer, "sqlite"),
         ForeignKey("organizaciones.id"),
         nullable=False,
     )
     emergencia_externa_id: Mapped[str] = mapped_column(
+        "id_emergencia_externa",
         String(255),
         nullable=False,
         comment="Identificador opaco de la emergencia en RescueSync o Bonita.",
     )
     nivel_gravedad: Mapped[NivelGravedad] = mapped_column(
-        Enum(NivelGravedad, name="nivel_gravedad_enum"),
+        Enum(
+            NivelGravedad,
+            name="nivel_gravedad_enum",
+            native_enum=False,
+            create_constraint=False,
+            length=50,
+            values_callable=_valores_enum,
+        ),
         nullable=False,
     )
     estado: Mapped[EstadoCompromiso] = mapped_column(
-        Enum(EstadoCompromiso, name="estado_compromiso_enum"),
+        Enum(
+            EstadoCompromiso,
+            name="estado_compromiso_enum",
+            native_enum=False,
+            create_constraint=False,
+            length=50,
+            values_callable=_valores_enum,
+        ),
         nullable=False,
         default=EstadoCompromiso.comprometido,
         server_default=EstadoCompromiso.comprometido.value,
@@ -277,24 +364,37 @@ class CompromisoItem(db.Model):
 
     __tablename__ = "compromiso_items"
     __table_args__ = (
-        UniqueConstraint("compromiso_id", "inventario_item_id"),
+        UniqueConstraint(
+            "id_compromiso",
+            "id_inventario_item",
+            name="uq_compitem_comp_invitem",
+        ),
         CheckConstraint("cantidad_comprometida > 0", name="cantidad_comprometida_positiva"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     compromiso_id: Mapped[int] = mapped_column(
+        "id_compromiso",
         Integer,
         ForeignKey("compromisos.id", ondelete="CASCADE"),
         nullable=False,
     )
     inventario_item_id: Mapped[int] = mapped_column(
+        "id_inventario_item",
         Integer,
         ForeignKey("inventario_items.id"),
         nullable=False,
     )
     cantidad_comprometida: Mapped[int] = mapped_column(Integer, nullable=False)
     tipo_asignacion: Mapped[TipoAsignacion] = mapped_column(
-        Enum(TipoAsignacion, name="tipo_asignacion_enum"),
+        Enum(
+            TipoAsignacion,
+            name="tipo_asignacion_enum",
+            native_enum=False,
+            create_constraint=False,
+            length=50,
+            values_callable=_valores_enum,
+        ),
         nullable=False,
     )
 

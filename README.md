@@ -139,7 +139,9 @@ app/                    código de la API
 migrations/             migraciones de Alembic (0001: línea base;
                         f5b04d297d15: organizaciones e inventarios;
                         c7a8f1d2e3b4: certificaciones;
-                        d026ce7dc122: compromisos de recursos)
+                        d026ce7dc122: compromisos de recursos;
+                        462daf0d4c41: consumible y ajuste de cantidades;
+                        a63f9d20bc41: alineación con el diagrama)
 tests/                  tests con pytest (SQLite en memoria)
 docs/adr/               decisiones de arquitectura
 docs/contratos/         contratos de configuración, errores y logging
