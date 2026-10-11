@@ -84,9 +84,7 @@ def test_organizacion_puede_tener_multiples_certificaciones(base_de_datos):
     db.session.add(organizacion)
     db.session.commit()
 
-    assert [
-        asignacion.certificacion.nombre for asignacion in organizacion.certificaciones
-    ] == [
+    assert [asignacion.certificacion.nombre for asignacion in organizacion.certificaciones] == [
         "ISO 9001",
         "IRAM 3546",
     ]
@@ -175,6 +173,8 @@ def test_compromiso_rechaza_cantidad_no_positiva(base_de_datos):
         db.session.commit()
 
     db.session.rollback()
+
+
 @pytest.mark.parametrize(
     "cantidad_disponible",
     [-1],

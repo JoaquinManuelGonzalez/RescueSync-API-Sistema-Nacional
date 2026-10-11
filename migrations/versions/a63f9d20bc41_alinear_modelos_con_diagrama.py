@@ -5,6 +5,7 @@ Revises: 462daf0d4c41
 Create Date: 2026-10-11 17:00:00.000000
 
 """
+
 from datetime import UTC, datetime
 from secrets import token_urlsafe
 
@@ -23,9 +24,7 @@ depends_on = None
 def upgrade():
     bind = op.get_bind()
     certificaciones_anteriores = list(
-        bind.execute(
-            sa.text("SELECT organizacion_id, nombre, tipo FROM certificaciones")
-        )
+        bind.execute(sa.text("SELECT organizacion_id, nombre, tipo FROM certificaciones"))
     )
     fecha_migracion = datetime.now(UTC)
 
@@ -34,9 +33,7 @@ def upgrade():
     op.add_column("organizaciones", sa.Column("password_hash", sa.Text(), nullable=True))
     for (organizacion_id,) in bind.execute(sa.text("SELECT id FROM organizaciones")):
         bind.execute(
-            sa.text(
-                "UPDATE organizaciones SET password_hash = :password_hash WHERE id = :id"
-            ),
+            sa.text("UPDATE organizaciones SET password_hash = :password_hash WHERE id = :id"),
             {
                 "id": organizacion_id,
                 "password_hash": generate_password_hash(token_urlsafe(32)),
@@ -278,13 +275,10 @@ def upgrade():
     )
 
     ids_certificaciones = {}
-    for nombre, tipo in sorted(
-        {(fila.nombre, fila.tipo) for fila in certificaciones_anteriores}
-    ):
+    for nombre, tipo in sorted({(fila.nombre, fila.tipo) for fila in certificaciones_anteriores}):
         certificacion_id = bind.execute(
             sa.text(
-                "INSERT INTO certificaciones (nombre, tipo) "
-                "VALUES (:nombre, :tipo) RETURNING id"
+                "INSERT INTO certificaciones (nombre, tipo) VALUES (:nombre, :tipo) RETURNING id"
             ),
             {"nombre": nombre, "tipo": tipo},
         ).scalar_one()

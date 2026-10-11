@@ -31,7 +31,6 @@ class TipoOrganizacion(enum.Enum):
     organismo_rescate = "organismo_rescate"
 
 
-
 class TipoItem(enum.Enum):
     """Categorías iniciales del catálogo de recursos y suministros."""
 
@@ -60,6 +59,7 @@ class EstadoCompromiso(enum.Enum):
     comprometido = "COMPROMETIDO"
     liberado = "LIBERADO"
     cancelado = "CANCELADO"
+
 
 class TipoAsignacion(enum.Enum):
     """

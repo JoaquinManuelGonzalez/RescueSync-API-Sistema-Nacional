@@ -41,8 +41,11 @@ def test_sembrar_carga_datos_y_es_idempotente(base_de_datos):
         len(certificaciones) for certificaciones in semillas.CERTIFICACIONES.values()
     )
     assert db.session.query(Certificacion).count() == len(
-        {(nombre, tipo) for certificaciones in semillas.CERTIFICACIONES.values()
-         for nombre, tipo in certificaciones}
+        {
+            (nombre, tipo)
+            for certificaciones in semillas.CERTIFICACIONES.values()
+            for nombre, tipo in certificaciones
+        }
     )
 
 
