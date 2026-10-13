@@ -11,6 +11,7 @@ from flask import Flask
 from flask_smorest import Api
 
 from app.modulos.autenticacion.rutas import blueprint_autenticacion
+from app.modulos.organizaciones.rutas import blueprint_organizaciones
 
 
 def registrar_modulos(app: Flask, api: Api) -> None:  # noqa: ARG001
@@ -28,6 +29,7 @@ def registrar_modulos(app: Flask, api: Api) -> None:  # noqa: ARG001
     """
 
     api.register_blueprint(blueprint_autenticacion)
+    api.register_blueprint(blueprint_organizaciones)
 
 
 def importar_modelos() -> None:
