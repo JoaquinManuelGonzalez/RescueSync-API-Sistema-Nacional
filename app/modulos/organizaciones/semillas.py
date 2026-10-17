@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from datetime import UTC, datetime
 
 from app.core.semillas import ResultadoSemilla, obtener_o_crear, registrar
@@ -113,6 +115,13 @@ ITEMS: dict[str, tuple[TipoItem, str, str]] = {
     "Tanques de agua": (TipoItem.maquinaria, "unidades", "Tanques de agua."),
 }
 
+
+def _codigo_recurso(nombre: str) -> str:
+    normalizado = unicodedata.normalize("NFKD", nombre).encode("ascii", "ignore").decode()
+    slug = re.sub(r"[^A-Z0-9]+", "_", normalizado.upper()).strip("_")
+    return f"RSR-{slug}"
+
+
 INVENTARIOS: dict[str, tuple[str, str, dict[str, int]]] = {
     "Cruz Solidaria": (
         "Depósito Cruz Solidaria",
@@ -212,7 +221,12 @@ def sembrar_items() -> list[ResultadoSemilla]:
         _, creado = obtener_o_crear(
             Item,
             claves={"nombre": nombre},
-            valores={"tipo": tipo, "unidad_medida": unidad, "descripcion": descripcion},
+            valores={
+                "codigo_recurso": _codigo_recurso(nombre),
+                "tipo": tipo,
+                "unidad_medida": unidad,
+                "descripcion": descripcion,
+            },
         )
         resultado.contar(creado)
     return [resultado]

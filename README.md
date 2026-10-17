@@ -154,13 +154,16 @@ app/                    código de la API
   modulos/              módulos de dominio:
     autenticacion/      /login, /cuentas/yo, tabla cuentas y comandos `flask cuentas`
     organizaciones/     padrón de ONGs (/ongs), estados de habilitación e inventarios
+    compromisos/        bloqueo y liberación de recursos
 migrations/             migraciones de Alembic (0001: línea base;
                         f5b04d297d15: organizaciones e inventarios;
                         c7a8f1d2e3b4: certificaciones;
                         d026ce7dc122: compromisos de recursos;
                         462daf0d4c41: consumible y ajuste de cantidades;
                         a63f9d20bc41: alineación con el diagrama;
-                        b8e41c7d2f90: cuentas y estado de habilitación)
+                        b8e41c7d2f90: cuentas y estado de habilitación;
+                        c0ebb05602a1: merge de ramas;
+                        4a7c2d9e1f63: finalización por ONG y cierre de proyecto)
 tests/                  tests con pytest (SQLite en memoria)
 docs/adr/               decisiones de arquitectura
 docs/contratos/         contratos de autenticación, configuración, errores y logging
@@ -526,6 +529,10 @@ proceso:
   [`docs/contratos/autenticacion.md`](docs/contratos/autenticacion.md).
 - Los endpoints de negocio que va a consumir Bonita (evaluación, reserva y compromiso de
   recursos) llegan en las épicas siguientes. El padrón (`GET /ongs/{cuit}`) ya está disponible.
+- La lógica de dominio para comprometer y liberar recursos está en `app/modulos/compromisos`;
+  [`POST /recursos/compromisos`](docs/contratos/compromisos.md) permite comprometer los recursos
+  seleccionados por el proceso. El endpoint de finalización registra el cierre de cada ONG y
+  libera el proyecto cuando todas terminan.
 
 ## Problemas conocidos
 
@@ -563,6 +570,7 @@ proceso:
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Convenciones de código, ramas, commits, flujo de épica, pase a `main` y despliegue continuo |
 | [`docs/adr/`](docs/adr/README.md) | ADR-001 framework, ADR-002 plataforma cloud (Render), ADR-003 contenedores y migraciones, ADR-004 base de datos en Supabase, ADR-005 autenticación JWT con cuentas de cliente |
 | [`docs/contratos/autenticacion.md`](docs/contratos/autenticacion.md) | Login, token, roles, permisos, trazabilidad y guía de configuración de Bonita |
+| [`docs/contratos/compromisos.md`](docs/contratos/compromisos.md) | Contrato inicial del endpoint de bloqueo de recursos |
 | [`docs/contratos/configuracion.md`](docs/contratos/configuracion.md) | Variables de entorno, fail-fast y gestión de secretos |
 | [`docs/contratos/errores.md`](docs/contratos/errores.md) | Envelope de error y qué significa cada código para Bonita |
 | [`docs/contratos/logging.md`](docs/contratos/logging.md) | Formato JSON de logs e id de correlación |

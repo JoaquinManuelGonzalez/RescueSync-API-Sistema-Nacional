@@ -66,9 +66,10 @@ usa el envelope.
 | 503 `SERVICIO_NO_DISPONIBLE` sostenido | La base no responde; en la nube, casi siempre el proyecto de Supabase pausado por inactividad | Camino de error técnico y avisar al equipo: se resuelve reactivando el proyecto (runbook del README), no reintentando |
 | Sin respuesta / timeout | El servicio puede estar despertando (plan Free de Render, ~1 minuto) | Reintentar; antes de una demo, despertar con `GET /health` |
 
-Las operaciones que comprometan recursos aceptarán una clave de idempotencia (encabezado
-`Idempotency-Key`), para que Bonita pueda reintentar ante un timeout sin comprometer dos veces el
-mismo recurso. Se implementa junto con esos endpoints, en una épica posterior.
+`POST /recursos/compromisos` es idempotente por `emergencia_externa_id`: repetir exactamente el
+mismo cuerpo devuelve el compromiso existente sin descontar stock otra vez; enviar datos
+diferentes para una emergencia ya comprometida devuelve `409`. La cabecera estándar
+`Idempotency-Key`, que permitirá distinguir intentos de una misma emergencia, queda pendiente.
 
 ## 4. Endpoint de salud
 
