@@ -32,9 +32,9 @@ Todo error, sin excepción, se devuelve con esta estructura JSON:
 
 | HTTP | Código interno | Cuándo se usa |
 |---|---|---|
-| 400 | `SOLICITUD_INVALIDA` | El JSON recibido está mal formado o incompleto |
-| 401 | `NO_AUTENTICADO` | Faltan credenciales o son inválidas |
-| 403 | `PERMISO_DENEGADO` | Las credenciales no habilitan la operación |
+| 400 | `SOLICITUD_INVALIDA` | El JSON recibido está mal formado o incompleto. `detalle` trae los mensajes por campo, agrupados por ubicación: `{"json": {"contrasena": ["Campo obligatorio."]}}` |
+| 401 | `NO_AUTENTICADO` | Faltan credenciales o son inválidas. `detalle.motivo`: `token_ausente`, `token_invalido`, `token_expirado`, `cuenta_inactiva` o, en `/login`, `credenciales_invalidas` ([autenticación](autenticacion.md)) |
+| 403 | `PERMISO_DENEGADO` | Las credenciales no habilitan la operación. `detalle`: `{"rol": ..., "roles_permitidos": [...]}` |
 | 404 | `RECURSO_NO_ENCONTRADO` | La entidad referenciada no existe, o la ruta no existe |
 | 405 | `METODO_NO_PERMITIDO` | El método HTTP no aplica a la ruta |
 | 409 | `CONFLICTO_DE_ESTADO` | La entidad no admite la transición pedida (por ejemplo, un recurso ya comprometido) |
@@ -46,11 +46,21 @@ Todo error, sin excepción, se devuelve con esta estructura JSON:
 Los módulos de dominio pueden definir códigos más específicos subclasificando
 `ErrorDeAplicacion` (`app/core/errores.py`), siempre con uno de estos códigos HTTP.
 
+Un cuerpo inválido es siempre 400, nunca 422: el `Blueprint` de `app/core/acceso.py` valida con
+400 y el manejador global convierte en 400 cualquier error de validación de webargs. El 422
+queda para las reglas de negocio.
+
+**Única excepción al envelope:** `POST /login` con un formulario OAuth2 client credentials
+responde los errores del RFC 6749 §5.2 (`{"error": "invalid_client", "error_description":
+"..."}`), porque el conector REST de Bonita lee `error` como texto. El mismo `/login` en JSON
+usa el envelope.
+
 ## 3. Qué significa cada familia para Bonita
 
 | Respuesta | Significado | Qué debería hacer el conector de Bonita |
 |---|---|---|
 | 2xx | Operación realizada | Continuar el flujo |
+| 401 | El token no sirve (vencido, inválido o de una cuenta desactivada) | Con el modo OAUTH2 del conector no debería pasar: el conector renueva el token solo. Si pasa, revisar los parámetros `snClientId` / `snClientSecret` |
 | 4xx | La API evaluó la solicitud y **la rechazó por su contenido** | **No reintentar** con el mismo cuerpo; tomar el camino de rechazo del proceso |
 | 5xx | Falla de disponibilidad | Reintentar con backoff; si persiste, camino de error técnico |
 | 503 `SERVICIO_NO_DISPONIBLE` sostenido | La base no responde; en la nube, casi siempre el proyecto de Supabase pausado por inactividad | Camino de error técnico y avisar al equipo: se resuelve reactivando el proyecto (runbook del README), no reintentando |

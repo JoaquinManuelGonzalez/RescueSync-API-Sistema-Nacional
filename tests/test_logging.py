@@ -4,6 +4,7 @@ import json
 import logging
 import uuid
 
+from app.core.acceso import Rol
 from app.core.logging import FormateadorJsonLines, redactar, redactar_cabeceras
 
 
@@ -70,3 +71,31 @@ def test_redactar_cabeceras_oculta_authorization_entera():
     cabeceras = redactar_cabeceras({"Authorization": "Bearer xyz", "Accept": "application/json"})
 
     assert cabeceras == {"Authorization": "***", "Accept": "application/json"}
+
+
+def test_solicitud_protegida_loguea_cuenta_rol_y_caso_sin_token_ni_usuario(
+    cliente, cabeceras, caplog
+):
+    autorizacion = cabeceras(
+        Rol.sistema,
+        {"X-Usuario-Bonita": "operador@chascomus.test", "X-Bonita-Process-Instance-Id": "4021"},
+    )
+
+    cliente.get("/cuentas/yo", headers=autorizacion)
+
+    completada = next(r.campos for r in caplog.records if r.evento == "solicitud_completada")
+    assert completada["cuenta"] == "bonita-rescuesync"
+    assert completada["rol"] == "sistema"
+    assert completada["caso_bonita"] == "4021"
+    texto = " ".join(str(r.campos) for r in caplog.records if hasattr(r, "campos"))
+    assert "operador@chascomus.test" not in texto
+    assert autorizacion["Authorization"].split()[1] not in texto
+
+
+def test_login_loguea_el_resultado_sin_el_usuario_tipeado(cliente, crear_cuenta, caplog):
+    crear_cuenta("admin-sn")
+
+    cliente.post("/login", json={"usuario": "alguien@tipeo.mal", "contrasena": "x"})
+
+    fallido = next(r.campos for r in caplog.records if r.evento == "ingreso_fallido")
+    assert fallido == {"motivo": "credenciales_invalidas", "modo": "json"}

@@ -22,7 +22,9 @@ Campos presentes en todo evento:
 | Evento | Nivel | Campos adicionales |
 |---|---|---|
 | `solicitud_entrante` | `INFO` | `metodo`, `endpoint`, `id_correlacion` |
-| `solicitud_completada` | `INFO` (2xx/3xx), `WARN` (4xx), `ERROR` (5xx) | `metodo`, `endpoint`, `codigo_estado`, `duracion_ms`, `id_correlacion` |
+| `solicitud_completada` | `INFO` (2xx/3xx), `WARN` (4xx), `ERROR` (5xx) | `metodo`, `endpoint`, `codigo_estado`, `duracion_ms`, `id_correlacion`; en endpoints protegidos, también `cuenta`, `rol` y, si Bonita lo mandó, `caso_bonita` |
+| `ingreso_exitoso` | `INFO` | `cuenta`, `rol`, `modo` (`json` o `client_credentials`) |
+| `ingreso_fallido` | `WARN` | `motivo` (`credenciales_invalidas` o `cuenta_inactiva`), `modo`. Sin el usuario: puede ser cualquier cosa que alguien tipeó |
 | `excepcion_no_contemplada` | `ERROR` | `mensaje` (tipo de la excepción), `id_correlacion` |
 | `salud_degradada` | `ERROR` | `mensaje` (tipo del error), `componente` |
 | `configuracion_invalida` | `ERROR` | `mensaje` (qué variable falta o es inválida) |
@@ -38,7 +40,9 @@ segundos.
 ## 3. Datos que nunca se registran
 
 Ningún log puede contener el encabezado `Authorization`, tokens, contraseñas, cookies, DNI o
-CUIT, nombres y apellidos, correos, teléfonos ni direcciones. `app/core/logging.py` provee
+CUIT, nombres y apellidos, correos, teléfonos ni direcciones. Tampoco la cabecera
+`X-Usuario-Bonita`, que es el email del usuario web: se guarda en los historiales de la base, no
+en los logs. `app/core/logging.py` provee
 `redactar()` y `redactar_cabeceras()`, que reemplazan esos campos por `"***"` (incluso anidados)
 antes de loguear cualquier cuerpo o encabezado. El cuerpo de las solicitudes no se loguea por
 defecto.

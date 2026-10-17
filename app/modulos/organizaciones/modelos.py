@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     BigInteger,
@@ -22,6 +23,9 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.extensiones import db
+
+if TYPE_CHECKING:
+    from app.modulos.autenticacion.modelos import Cuenta
 
 
 class TipoOrganizacion(enum.Enum):
@@ -59,6 +63,18 @@ class EstadoCompromiso(enum.Enum):
     comprometido = "COMPROMETIDO"
     liberado = "LIBERADO"
     cancelado = "CANCELADO"
+
+
+class EstadoHabilitacion(enum.Enum):
+    """Estado de una organización en el padrón nacional.
+
+    Solo una organización `habilitada` puede comprometer recursos. Las transiciones permitidas
+    están en `organizaciones/servicios.py` y cada cambio queda en `HistorialHabilitacion`.
+    """
+
+    pendiente = "pendiente"
+    habilitada = "habilitada"
+    suspendida = "suspendida"
 
 
 class TipoAsignacion(enum.Enum):
@@ -100,19 +116,25 @@ class Organizacion(db.Model):
     )
     nombre: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     mail_contacto: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
-    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     telefono_contacto: Mapped[str | None] = mapped_column(Text, nullable=True)
     identificador_nacional: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
         unique=True,
-        comment="CUIT u otro identificador oficial.",
+        comment="CUIT con formato NN-NNNNNNNN-N. Es la clave compartida con la aplicación web.",
     )
-    activa: Mapped[bool] = mapped_column(
-        Boolean,
+    estado_habilitacion: Mapped[EstadoHabilitacion] = mapped_column(
+        Enum(
+            EstadoHabilitacion,
+            name="estado_habilitacion_enum",
+            native_enum=False,
+            create_constraint=False,
+            length=50,
+            values_callable=_valores_enum,
+        ),
         nullable=False,
-        default=True,
-        server_default=text("true"),
+        default=EstadoHabilitacion.pendiente,
+        server_default=EstadoHabilitacion.pendiente.value,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -136,6 +158,78 @@ class Organizacion(db.Model):
         cascade="all, delete-orphan",
     )
     compromisos: Mapped[list[Compromiso]] = relationship(back_populates="organizacion")
+    historial_habilitacion: Mapped[list[HistorialHabilitacion]] = relationship(
+        back_populates="organizacion",
+        cascade="all, delete-orphan",
+        order_by="HistorialHabilitacion.id",
+    )
+
+
+class HistorialHabilitacion(db.Model):
+    """Cada cambio de estado de habilitación de una organización, incluida el alta."""
+
+    __tablename__ = "historial_habilitaciones"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+    )
+    organizacion_id: Mapped[int] = mapped_column(
+        "id_organizacion",
+        BigInteger().with_variant(Integer, "sqlite"),
+        ForeignKey("organizaciones.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    estado_anterior: Mapped[EstadoHabilitacion | None] = mapped_column(
+        Enum(
+            EstadoHabilitacion,
+            name="estado_habilitacion_enum",
+            native_enum=False,
+            create_constraint=False,
+            length=50,
+            values_callable=_valores_enum,
+        ),
+        nullable=True,
+        comment="Null en el alta.",
+    )
+    estado_nuevo: Mapped[EstadoHabilitacion] = mapped_column(
+        Enum(
+            EstadoHabilitacion,
+            name="estado_habilitacion_enum",
+            native_enum=False,
+            create_constraint=False,
+            length=50,
+            values_callable=_valores_enum,
+        ),
+        nullable=False,
+    )
+    motivo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cuenta_id: Mapped[int | None] = mapped_column(
+        "id_cuenta",
+        BigInteger().with_variant(Integer, "sqlite"),
+        ForeignKey("cuentas.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="Cuenta de la API que hizo el cambio. Null en semillas y migraciones.",
+    )
+    usuario_bonita: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="X-Usuario-Bonita: persona que disparó el cambio desde el proceso.",
+    )
+    caso_bonita: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="X-Bonita-Process-Instance-Id: caso del proceso que hizo el cambio.",
+    )
+    fecha: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    organizacion: Mapped[Organizacion] = relationship(back_populates="historial_habilitacion")
+    cuenta: Mapped[Cuenta | None] = relationship()
 
 
 class Certificacion(db.Model):

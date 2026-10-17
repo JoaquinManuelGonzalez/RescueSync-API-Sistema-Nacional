@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from datetime import timedelta
 
 from sqlalchemy.engine import make_url
 
@@ -19,6 +20,7 @@ from app.core.logging import configurar_logging, registrar_evento
 VARIABLES_OBLIGATORIAS: tuple[str, ...] = (
     "SECRET_KEY",
     "DATABASE_URL",
+    "JWT_SECRET_KEY",
 )
 
 VARIABLES_OPCIONALES: dict[str, str] = {
@@ -29,9 +31,22 @@ VARIABLES_OPCIONALES: dict[str, str] = {
     # Vacio: sin TLS hacia la base (PostgreSQL local de docker compose). En Render se fija en
     # "require" desde render.yaml, porque la conexion a Supabase viaja por internet.
     "DATABASE_SSLMODE": "",
+    # Vida de los tokens que emite /login. El conector REST de Bonita pide uno nuevo 60 segundos
+    # antes del vencimiento, asi que el valor solo pesa en las pruebas manuales (Swagger, Postman).
+    "JWT_EXPIRACION_MINUTOS": "60",
 }
 
-VARIABLES_ENTERAS: tuple[str, ...] = ("PORT",)
+VARIABLES_ENTERAS: tuple[str, ...] = ("PORT", "JWT_EXPIRACION_MINUTOS")
+
+# Firma de los JWT (docs/contratos/autenticacion.md). HS256 pide una clave de al menos 256 bits:
+# 32 caracteres es el minimo que se acepta para que una clave corta no pase desapercibida.
+LARGO_MINIMO_CLAVE_JWT = 32
+MINUTOS_MAXIMOS_JWT = 24 * 60
+ALGORITMO_JWT = "HS256"
+# Claims registrados del RFC 7519: quien emite el token (iss) y para quien es (aud). Los dos los
+# fija y los verifica esta misma API.
+EMISOR_JWT = "sistema-nacional"
+AUDIENCIA_JWT = "sistema-nacional-api"
 
 # Tiempo maximo para abrir una conexion a la base. Render da por fallido un health check que
 # no responde en 5 segundos. El pool puede necesitar dos intentos (pre-ping de una conexion
@@ -41,6 +56,12 @@ SEGUNDOS_TIMEOUT_DE_CONEXION = 2
 MENSAJE_FALTANTE = "Falta la variable de entorno obligatoria: {nombre}"
 MENSAJE_NO_ENTERA = "La variable de entorno {nombre} debe ser un numero entero"
 MENSAJE_URL_INVALIDA = "La variable de entorno DATABASE_URL no es una URL de base de datos valida"
+MENSAJE_CLAVE_JWT_CORTA = (
+    f"La variable de entorno JWT_SECRET_KEY debe tener al menos {LARGO_MINIMO_CLAVE_JWT} caracteres"
+)
+MENSAJE_EXPIRACION_JWT = (
+    f"La variable de entorno JWT_EXPIRACION_MINUTOS debe estar entre 1 y {MINUTOS_MAXIMOS_JWT}"
+)
 
 
 def _leer(nombre: str) -> str:
@@ -129,6 +150,12 @@ def construir_configuracion() -> dict[str, object]:
         except ValueError:
             problemas.append(MENSAJE_NO_ENTERA.format(nombre=nombre))
 
+    if len(str(valores["JWT_SECRET_KEY"])) < LARGO_MINIMO_CLAVE_JWT:
+        problemas.append(MENSAJE_CLAVE_JWT_CORTA)
+    minutos_jwt = valores["JWT_EXPIRACION_MINUTOS"]
+    if isinstance(minutos_jwt, int) and not 1 <= minutos_jwt <= MINUTOS_MAXIMOS_JWT:
+        problemas.append(MENSAJE_EXPIRACION_JWT)
+
     try:
         url = normalizar_url_de_base(str(valores["DATABASE_URL"]), str(valores["DATABASE_SSLMODE"]))
     except ValueError as error:
@@ -143,7 +170,25 @@ def construir_configuracion() -> dict[str, object]:
     valores["SQLALCHEMY_ENGINE_OPTIONS"] = _opciones_del_engine(url)
     valores["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+    valores.update(_configuracion_jwt(int(str(valores["JWT_EXPIRACION_MINUTOS"]))))
+
     return valores
+
+
+def _configuracion_jwt(minutos: int) -> dict[str, object]:
+    """Claves que lee flask-jwt-extended (JWT_SECRET_KEY ya viene de las obligatorias)."""
+    return {
+        "JWT_ALGORITHM": ALGORITMO_JWT,
+        # Solo el encabezado Authorization: el unico cliente es un conector REST, sin cookies.
+        "JWT_TOKEN_LOCATION": ["headers"],
+        "JWT_HEADER_NAME": "Authorization",
+        "JWT_HEADER_TYPE": "Bearer",
+        "JWT_ACCESS_TOKEN_EXPIRES": timedelta(minutes=minutos),
+        "JWT_ENCODE_ISSUER": EMISOR_JWT,
+        "JWT_DECODE_ISSUER": EMISOR_JWT,
+        "JWT_ENCODE_AUDIENCE": AUDIENCIA_JWT,
+        "JWT_DECODE_AUDIENCE": AUDIENCIA_JWT,
+    }
 
 
 def validar_o_terminar() -> None:

@@ -16,6 +16,7 @@ import logging
 from typing import Any
 
 from flask import Flask, jsonify
+from marshmallow import Schema, fields
 from werkzeug.exceptions import HTTPException
 
 from app.core.logging import id_correlacion_actual, marca_de_tiempo, registrar_evento
@@ -118,6 +119,53 @@ class ServicioNoDisponible(ErrorDeAplicacion):
     estado_http = 503
 
 
+class CuerpoError(Schema):
+    """Contenido de `error` en el envelope. Solo documenta: las respuestas se arman a mano."""
+
+    codigo = fields.String(
+        required=True, metadata={"description": "Código interno estable (contrato de errores)."}
+    )
+    mensaje = fields.String(required=True, metadata={"description": "Mensaje en español."})
+    detalle = fields.Raw(
+        allow_none=True,
+        metadata={"description": "Información adicional: campos inválidos, motivo, etc."},
+    )
+    timestamp = fields.String(required=True, metadata={"description": "ISO-8601 UTC."})
+    id_correlacion = fields.String(
+        required=True, metadata={"description": "X-Correlation-Id recibido o generado."}
+    )
+
+
+class RespuestaError(Schema):
+    """Envelope único de error. flask-smorest lo usa para documentar los errores 4xx/5xx."""
+
+    error = fields.Nested(CuerpoError, required=True)
+
+
+# Traduccion de los mensajes de validacion de marshmallow que mas aparecen. El resto se devuelve
+# tal cual: el `mensaje` del envelope ya esta en espanol y el detalle es orientativo.
+MENSAJES_DE_VALIDACION: dict[str, str] = {
+    "Missing data for required field.": "Campo obligatorio.",
+    "Unknown field.": "Campo desconocido.",
+    "Field may not be null.": "No puede ser nulo.",
+    "Not a valid string.": "Debe ser un texto.",
+    "Not a valid integer.": "Debe ser un número entero.",
+    "Not a valid email address.": "No es un correo electrónico válido.",
+    "Invalid input type.": "Tipo de dato inválido.",
+}
+
+
+def traducir_mensajes(mensajes: Any) -> Any:
+    """Recorre los mensajes de validacion (anidados por ubicacion y campo) y los traduce."""
+    if isinstance(mensajes, dict):
+        return {clave: traducir_mensajes(valor) for clave, valor in mensajes.items()}
+    if isinstance(mensajes, list):
+        return [traducir_mensajes(valor) for valor in mensajes]
+    if isinstance(mensajes, str):
+        return MENSAJES_DE_VALIDACION.get(mensajes, mensajes)
+    return mensajes
+
+
 def construir_envelope(codigo: str, mensaje: str, detalle: Any = None) -> dict[str, Any]:
     """Arma el cuerpo de error del contrato, con timestamp y correlacion ya resueltos."""
     return {
@@ -141,6 +189,17 @@ def registrar_manejadores(app: Flask) -> None:
 
     @app.errorhandler(HTTPException)
     def _error_http(error: HTTPException):
+        # webargs (detras de @blp.arguments) aborta con los mensajes por campo en `error.data`.
+        # Para el contrato es un cuerpo invalido: 400 con el detalle, nunca un 422 sin datos.
+        mensajes = (getattr(error, "data", None) or {}).get("messages")
+        if mensajes:
+            cuerpo = construir_envelope(
+                "SOLICITUD_INVALIDA",
+                MENSAJES_POR_CODIGO["SOLICITUD_INVALIDA"],
+                traducir_mensajes(mensajes),
+            )
+            return jsonify(cuerpo), 400
+
         estado = error.code or 500
         codigo = CODIGOS_POR_ESTADO.get(estado, "ERROR_INTERNO")
         mensaje = MENSAJES_POR_CODIGO.get(codigo, error.name)

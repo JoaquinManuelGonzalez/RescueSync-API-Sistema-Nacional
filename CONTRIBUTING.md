@@ -58,25 +58,31 @@ Alembic genera esos nombres solo, sin que haya que escribirlos a mano.
 app/
   __init__.py        app factory: create_app()
   wsgi.py            objeto que levantan flask y gunicorn (app.wsgi:app)
-  extensiones.py     db, migrate
-  core/              transversal: configuracion, errores, logging, salud
+  extensiones.py     db, migrate, jwt
+  core/              transversal: configuracion, errores, logging, salud,
+                     acceso (JWT y roles), openapi (Swagger)
   modulos/
     __init__.py      registrar_modulos() e importar_modelos()
     <modulo>/
-      rutas.py       blueprint Flask: define los endpoints HTTP
+      rutas.py       blueprint de app.core.acceso: define los endpoints HTTP
+                     (si un modulo tiene mas de uno: rutas_<tema>.py)
       servicios.py   logica de negocio (unico punto de entrada para otros modulos)
       modelos.py     modelos SQLAlchemy y consultas propias del modulo
 migrations/          migraciones de Alembic (Flask-Migrate)
 tests/
 docs/
   adr/               decisiones de arquitectura
-  contratos/         contratos de configuracion, errores y logging
+  contratos/         contratos de autenticacion, configuracion, errores y logging
+  postman/           coleccion y entornos de Postman
 ```
 
 - Una entidad de dominio nueva va en `modelos.py` del módulo dueño, y se agrega a
   `importar_modelos()` para que Alembic la vea.
 - Un módulo pide datos de otro solo a través de su `servicios.py`, nunca importando sus modelos.
-- Lo transversal (configuración, errores, logging, salud) va en `core/`.
+- Lo transversal (configuración, errores, logging, salud, autenticación) va en `core/`.
+- Todo endpoint usa el `Blueprint` de `app.core.acceso` y cada método lleva
+  `@blp.requiere_rol(...)` **arriba de todo** (`docs/contratos/autenticacion.md`, sección 9).
+  `tests/test_rutas_protegidas.py` falla si una ruta responde sin token.
 
 ## 4. Entorno local, formato y verificación (uv + Ruff)
 

@@ -6,6 +6,7 @@ importaciones circulares. La aplicacion las inicializa con `init_app()` en `app/
 
 from __future__ import annotations
 
+from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import MetaData
@@ -31,3 +32,5 @@ class Base(DeclarativeBase):
 
 db = SQLAlchemy(model_class=Base)
 migrate = Migrate()
+# Emision y verificacion de JWT. Sus respuestas de error las define app/core/acceso.py.
+jwt = JWTManager()

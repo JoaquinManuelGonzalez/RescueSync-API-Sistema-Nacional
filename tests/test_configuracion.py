@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
 import pytest
 
 from app import create_app
 from app.core.configuracion import construir_configuracion, normalizar_url_de_base
 
 
-@pytest.mark.parametrize("variable", ["SECRET_KEY", "DATABASE_URL"])
+@pytest.mark.parametrize("variable", ["SECRET_KEY", "DATABASE_URL", "JWT_SECRET_KEY"])
 def test_falta_variable_obligatoria_termina_el_proceso(entorno_completo, capsys, variable):
     entorno_completo.delenv(variable)
 
@@ -39,6 +41,40 @@ def test_valores_por_defecto_de_las_opcionales(entorno_completo):
     assert configuracion["APP_ENV"] == "local"
     assert configuracion["PORT"] == 8000
     assert configuracion["LOG_LEVEL"] == "INFO"
+    assert configuracion["JWT_EXPIRACION_MINUTOS"] == 60
+    assert configuracion["JWT_ACCESS_TOKEN_EXPIRES"] == timedelta(minutes=60)
+
+
+def test_configuracion_jwt_fija_algoritmo_emisor_y_audiencia(entorno_completo):
+    configuracion = construir_configuracion()
+
+    assert configuracion["JWT_ALGORITHM"] == "HS256"
+    assert configuracion["JWT_TOKEN_LOCATION"] == ["headers"]
+    assert configuracion["JWT_ENCODE_ISSUER"] == configuracion["JWT_DECODE_ISSUER"]
+    assert configuracion["JWT_ENCODE_AUDIENCE"] == configuracion["JWT_DECODE_AUDIENCE"]
+
+
+def test_clave_jwt_corta_termina_el_proceso(entorno_completo, capsys):
+    entorno_completo.setenv("JWT_SECRET_KEY", "corta")
+
+    with pytest.raises(SystemExit):
+        construir_configuracion()
+
+    assert "JWT_SECRET_KEY debe tener al menos 32 caracteres" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("valor", ["0", "1441", "una hora"])
+def test_expiracion_jwt_invalida_termina_el_proceso(entorno_completo, valor):
+    entorno_completo.setenv("JWT_EXPIRACION_MINUTOS", valor)
+
+    with pytest.raises(SystemExit):
+        construir_configuracion()
+
+
+def test_expiracion_jwt_configurable(entorno_completo):
+    entorno_completo.setenv("JWT_EXPIRACION_MINUTOS", "15")
+
+    assert construir_configuracion()["JWT_ACCESS_TOKEN_EXPIRES"] == timedelta(minutes=15)
 
 
 @pytest.mark.parametrize(

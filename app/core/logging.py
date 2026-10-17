@@ -211,5 +211,21 @@ def registrar_middleware(app: Flask) -> None:
             codigo_estado=respuesta.status_code,
             duracion_ms=duracion_ms,
             id_correlacion=id_correlacion_actual(),
+            **_campos_del_actor(),
         )
         return respuesta
+
+
+def _campos_del_actor() -> dict[str, Any]:
+    """Cuenta, rol y caso de Bonita de la solicitud, si paso por `requiere_rol`.
+
+    El actor lo deja app/core/acceso.py en `g.actor`; se lee por atributos para no importar ese
+    modulo desde aca. `usuario_bonita` no se loguea: es un email (seccion 3 del contrato).
+    """
+    actor = g.get("actor")
+    if actor is None:
+        return {}
+    campos: dict[str, Any] = {"cuenta": actor.cuenta, "rol": actor.rol.value}
+    if actor.caso_bonita:
+        campos["caso_bonita"] = actor.caso_bonita
+    return campos
