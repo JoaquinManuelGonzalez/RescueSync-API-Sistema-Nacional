@@ -22,8 +22,9 @@ Todo ADR nuevo parte de la plantilla [`ADR-000-plantilla.md`](./ADR-000-plantill
 | 002 | Plataforma de despliegue en la nube | Reemplazado parcialmente por ADR-004 | 2026-10-03 | [ADR-002-plataforma-cloud-render.md](./ADR-002-plataforma-cloud-render.md) |
 | 003 | Contenedores y ejecución de migraciones | Reemplazado parcialmente por ADR-004 | 2026-10-03 | [ADR-003-contenedores-y-migraciones.md](./ADR-003-contenedores-y-migraciones.md) |
 | 004 | Base de datos administrada en Supabase | Aceptado | 2026-10-05 | [ADR-004-base-de-datos-supabase.md](./ADR-004-base-de-datos-supabase.md) |
+| 005 | Autenticación JWT con cuentas de cliente | Aceptado | 2026-10-17 | [ADR-005-autenticacion-jwt-y-cuentas-de-cliente.md](./ADR-005-autenticacion-jwt-y-cuentas-de-cliente.md) |
 
-El siguiente ADR usa el número `005`.
+El siguiente ADR usa el número `006`.
 
 ## Ciclo de vida
 
