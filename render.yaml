@@ -47,11 +47,17 @@ services:
         value: require
       - key: SECRET_KEY
         generateValue: true
+      # Firma de los JWT. Si la variable no existe, Render la crea al sincronizar el Blueprint con
+      # un valor aleatorio de 256 bits. Rotarla invalida los tokens vigentes: Bonita pide otro.
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: JWT_EXPIRACION_MINUTOS
+        value: "60"
       - key: APP_ENV
         value: produccion
       - key: LOG_LEVEL
         value: INFO
-      # Secretos futuros (credenciales de Bonita, claves JWT) se declaran asi, sin valor:
+      # Secretos futuros que no se puedan generar se declaran asi, sin valor:
       #   - key: NOMBRE_DEL_SECRETO
       #     sync: false
       # Render los pide SOLO al crear el Blueprint; si se agregan despues, se cargan a mano en

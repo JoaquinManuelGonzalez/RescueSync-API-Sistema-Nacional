@@ -6,6 +6,8 @@ from app.extensiones import db
 from app.modulos.organizaciones import semillas
 from app.modulos.organizaciones.modelos import (
     Certificacion,
+    EstadoHabilitacion,
+    HistorialHabilitacion,
     InventarioItem,
     Item,
     Organizacion,
@@ -80,3 +82,27 @@ def test_comando_flask_seed_carga_los_datos(app):
 
         db.session.remove()
         db.drop_all()
+
+
+def test_semillas_dejan_estado_e_historial_de_habilitacion(base_de_datos):
+    from app.core.semillas import SEEDERS, importar_seeders
+
+    importar_seeders()
+    for seeder in SEEDERS:
+        seeder.funcion()
+    db.session.commit()
+
+    estados = {
+        organizacion.nombre: organizacion.estado_habilitacion
+        for organizacion in db.session.query(Organizacion).all()
+    }
+    suspendidas = {
+        nombre for nombre, estado in estados.items() if estado is EstadoHabilitacion.suspendida
+    }
+    assert suspendidas == set(semillas.SUSPENDIDAS_DE_DEMOSTRACION)
+    assert all(
+        estado is EstadoHabilitacion.habilitada
+        for nombre, estado in estados.items()
+        if nombre not in suspendidas
+    )
+    assert db.session.query(HistorialHabilitacion).count() == len(estados)

@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from secrets import token_urlsafe
-
-from werkzeug.security import generate_password_hash
 
 from app.core.semillas import ResultadoSemilla, obtener_o_crear, registrar
 from app.modulos.organizaciones.modelos import (
     Certificacion,
+    EstadoHabilitacion,
+    HistorialHabilitacion,
     Inventario,
     InventarioItem,
     Item,
@@ -35,6 +34,16 @@ ORGANIZACIONES_DE_DEMOSTRACION: tuple[tuple[str, TipoOrganizacion, str], ...] = 
     ("Bomberos Voluntarios de La Plata", TipoOrganizacion.organismo_rescate, "30-99999999-5"),
     ("Grupo Scouts de Pergamino", TipoOrganizacion.ong, "30-99999999-6"),
 )
+
+# Mismos CUIT que las semillas de la aplicacion web: es la clave con la que se cruzan las
+# organizaciones de los dos sistemas. Todas arrancan habilitadas salvo las de esta tabla, que
+# muestran el caso de una ONG registrada que con el tiempo quedo inhabilitada.
+SUSPENDIDAS_DE_DEMOSTRACION: dict[str, str] = {
+    "Cruz Roja Argentina - Filial Bahía Blanca": (
+        "Certificación sanitaria vencida (dato de demostración)."
+    ),
+}
+MOTIVO_SEMILLA = "Estado inicial del padrón (datos de demostración)."
 
 CERTIFICACIONES: dict[str, tuple[tuple[str, TipoItem], ...]] = {
     "Cruz Solidaria": (
@@ -168,16 +177,30 @@ INVENTARIOS: dict[str, tuple[str, str, dict[str, int]]] = {
 def sembrar_organizaciones() -> list[ResultadoSemilla]:
     resultado = ResultadoSemilla("organizaciones")
     for nombre, tipo, identificador in ORGANIZACIONES_DE_DEMOSTRACION:
-        _, creado = obtener_o_crear(
+        motivo_suspension = SUSPENDIDAS_DE_DEMOSTRACION.get(nombre)
+        estado = (
+            EstadoHabilitacion.suspendida if motivo_suspension else EstadoHabilitacion.habilitada
+        )
+        organizacion, creado = obtener_o_crear(
             Organizacion,
             claves={"nombre": nombre},
             valores={
                 "tipo": tipo,
                 "mail_contacto": f"semillas+{identificador.replace('-', '')}@rescuesync.example",
-                "password_hash": generate_password_hash(token_urlsafe(32)),
                 "identificador_nacional": identificador,
+                "estado_habilitacion": estado,
             },
         )
+        # El historial solo se escribe al crear: una organizacion que ya existia conserva su
+        # estado operativo (por ejemplo, la que un administrador habilito a mano).
+        if creado:
+            organizacion.historial_habilitacion.append(
+                HistorialHabilitacion(
+                    estado_anterior=None,
+                    estado_nuevo=estado,
+                    motivo=motivo_suspension or MOTIVO_SEMILLA,
+                )
+            )
         resultado.contar(creado)
     return [resultado]
 
