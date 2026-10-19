@@ -275,9 +275,10 @@ class DisponibilidadDeOrganizacion(MethodView):
         if args["tipo"] is not None:
             consulta = consulta.where(Item.tipo == args["tipo"])
 
-        total = db.session.scalar(
-            select(func.count()).select_from(consulta.order_by(None).subquery())
-        ) or 0
+        total = (
+            db.session.scalar(select(func.count()).select_from(consulta.order_by(None).subquery()))
+            or 0
+        )
         filas = db.session.execute(
             consulta.order_by(Item.nombre, Item.id)
             .offset((pagina - 1) * por_pagina)
@@ -308,9 +309,7 @@ class CargaDeInventario(MethodView):
     @blueprint_organizaciones.alt_response(409, schema=RespuestaError)
     def post(self, datos, cuit):
         """Cargar un ítem y su cantidad disponible en el inventario de una ONG."""
-        registro = servicios.cargar_item(
-            cuit, datos["item_id"], datos["cantidad_disponible"]
-        )
+        registro = servicios.cargar_item(cuit, datos["item_id"], datos["cantidad_disponible"])
         return {
             "id": registro.id,
             "item_id": registro.item_id,

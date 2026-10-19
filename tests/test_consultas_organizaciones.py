@@ -157,9 +157,7 @@ def test_disponibilidad_descuenta_solo_compromisos_activos(base_de_datos, client
     ]
 
 
-def test_disponibilidad_de_una_organizacion_filtra_sus_recursos(
-    base_de_datos, cliente, cabeceras
-):
+def test_disponibilidad_de_una_organizacion_filtra_sus_recursos(base_de_datos, cliente, cabeceras):
     organizacion = Organizacion(
         tipo=TipoOrganizacion.ong,
         nombre="ONG específica",
@@ -194,9 +192,7 @@ def test_disponibilidad_de_una_organizacion_filtra_sus_recursos(
     assert cuerpo["elementos"][0]["disponible"] == 4
 
 
-def test_disponibilidad_de_organizacion_inexistente_responde_404(
-    base_de_datos, cliente, cabeceras
-):
+def test_disponibilidad_de_organizacion_inexistente_responde_404(base_de_datos, cliente, cabeceras):
     respuesta = cliente.get(
         "/ongs/30-11111111-1/recursos/disponibilidad",
         headers=cabeceras(),

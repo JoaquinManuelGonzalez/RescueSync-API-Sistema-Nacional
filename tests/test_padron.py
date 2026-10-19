@@ -209,9 +209,7 @@ def test_bonita_no_puede_cambiar_el_estado(cliente, cabeceras, organizacion):
     assert respuesta.status_code == 403
 
 
-def test_administrador_carga_item_y_cantidad_al_inventario(
-    cliente, cabeceras, organizacion
-):
+def test_administrador_carga_item_y_cantidad_al_inventario(cliente, cabeceras, organizacion):
     item = Item(nombre="Agua potable", tipo=TipoItem.agua, unidad_medida="litros")
     db.session.add(item)
     db.session.commit()
