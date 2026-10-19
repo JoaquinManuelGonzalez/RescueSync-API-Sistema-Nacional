@@ -47,6 +47,8 @@ class PeticionCambioHabilitacion(Schema):
             raise ValidationError("Obligatorio al suspender una organización.", "motivo")
 
 
+
+
 class OrganizacionPadron(Schema):
     id = fields.Integer(required=True)
     cuit = fields.String(attribute="identificador_nacional", required=True)

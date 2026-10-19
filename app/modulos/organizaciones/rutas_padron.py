@@ -118,6 +118,8 @@ class Habilitacion(MethodView):
         return _ficha(organizacion)
 
 
+
+
 @blueprint_padron.route("/<string:cuit>/habilitacion/historial")
 class HistorialDeHabilitacion(MethodView):
     @blueprint_padron.requiere_rol(Rol.sistema, Rol.administrador)

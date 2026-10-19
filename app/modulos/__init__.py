@@ -30,12 +30,12 @@ def registrar_modulos(app: Flask, api: Api) -> None:  # noqa: ARG001
 
     api.register_blueprint(blueprint_autenticacion)
     api.register_blueprint(blueprint_padron)
+    api.register_blueprint(blueprint_organizaciones)
 
 
 def registrar_comandos(app: Flask) -> None:
     """Registra los comandos de consola de los modulos (`flask <grupo> <comando>`)."""
     app.cli.add_command(grupo_cuentas)
-    api.register_blueprint(blueprint_organizaciones)
 
 
 def importar_modelos() -> None:

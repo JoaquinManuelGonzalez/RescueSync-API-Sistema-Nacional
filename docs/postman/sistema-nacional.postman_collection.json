@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "RescueSync - API del Sistema Nacional",
-    "description": "Pruebas de la autenticación JWT y del padrón de ONGs. Elegir el entorno (local o render), completar contrasenaAdmin y clientSecretBonita, y correr la colección en orden (Run collection). Ver docs/contratos/autenticacion.md.",
+    "description": "Pruebas de la autenticación JWT, las consultas de catálogo y el padrón de ONGs. Elegir el entorno (local o render), completar contrasenaAdmin y clientSecretBonita, y correr la colección en orden (Run collection). Ver docs/contratos/autenticacion.md.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -530,7 +530,261 @@
       ]
     },
     {
-      "name": "3. Padrón de ONGs",
+      "name": "3. Consultas de catálogo",
+      "description": "Consultas protegidas del catálogo nacional. Requieren el rol sistema o administrador.",
+      "item": [
+        {
+          "name": "Catálogo de certificaciones",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/certificaciones?pagina=1&por_pagina=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "certificaciones"
+              ],
+              "query": [
+                {
+                  "key": "pagina",
+                  "value": "1"
+                },
+                {
+                  "key": "por_pagina",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Lista las certificaciones del catálogo con paginación.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200 con paginación\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const cuerpo = pm.response.json();",
+                  "  pm.expect(cuerpo).to.have.all.keys(\"elementos\", \"pagina\", \"por_pagina\", \"total\");",
+                  "  pm.expect(cuerpo.pagina).to.eql(1);",
+                  "  pm.expect(cuerpo.por_pagina).to.eql(20);",
+                  "  pm.expect(cuerpo.elementos).to.be.an(\"array\");",
+                  "  pm.expect(cuerpo.total).to.be.a(\"number\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ONGs habilitadas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ongs?pagina=1&por_pagina=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs"
+              ],
+              "query": [
+                {
+                  "key": "pagina",
+                  "value": "1"
+                },
+                {
+                  "key": "por_pagina",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Lista únicamente ONGs con estado de habilitación habilitada.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200 con organizaciones paginadas\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const cuerpo = pm.response.json();",
+                  "  pm.expect(cuerpo).to.have.all.keys(\"elementos\", \"pagina\", \"por_pagina\", \"total\");",
+                  "  pm.expect(cuerpo.elementos).to.be.an(\"array\");",
+                  "  pm.expect(cuerpo.total).to.be.a(\"number\");",
+                  "});",
+                  "pm.test(\"Todas las organizaciones devueltas incluyen su CUIT\", () => {",
+                  "  pm.response.json().elementos.forEach((organizacion) => {",
+                  "    pm.expect(organizacion).to.have.property(\"cuit\");",
+                  "    pm.expect(organizacion).to.have.property(\"certificaciones\");",
+                  "    pm.expect(organizacion.id).to.be.a(\"number\");",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Disponibilidad global de agua",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recursos/disponibilidad?tipo=agua&pagina=1&por_pagina=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recursos",
+                "disponibilidad"
+              ],
+              "query": [
+                {
+                  "key": "tipo",
+                  "value": "agua"
+                },
+                {
+                  "key": "pagina",
+                  "value": "1"
+                },
+                {
+                  "key": "por_pagina",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Consulta la disponibilidad de recursos de tipo agua, descontando compromisos activos.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200 con disponibilidad paginada\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const cuerpo = pm.response.json();",
+                  "  pm.expect(cuerpo).to.have.all.keys(\"elementos\", \"pagina\", \"por_pagina\", \"total\");",
+                  "  pm.expect(cuerpo.elementos).to.be.an(\"array\");",
+                  "});",
+                  "pm.test(\"Cada recurso expone consumible, totales y disponible\", () => {",
+                  "  pm.response.json().elementos.forEach((recurso) => {",
+                  "    pm.expect(recurso.tipo).to.eql(\"agua\");",
+                  "    pm.expect(recurso.consumible).to.be.a(\"boolean\");",
+                  "    pm.expect(recurso.total).to.be.a(\"number\");",
+                  "    pm.expect(recurso.comprometido).to.be.a(\"number\");",
+                  "    pm.expect(recurso.disponible).to.be.a(\"number\");",
+                  "    pm.expect(recurso.disponible).to.be.at.least(0);",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+        ,
+        {
+          "name": "Disponibilidad de una ONG",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ongs/30-65432198-7/recursos/disponibilidad?pagina=1&por_pagina=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs",
+                "30-65432198-7",
+                "recursos",
+                "disponibilidad"
+              ],
+              "query": [
+                {
+                  "key": "pagina",
+                  "value": "1"
+                },
+                {
+                  "key": "por_pagina",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Consulta los recursos disponibles de Cruz Solidaria, identificada por su CUIT.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200 con disponibilidad de la ONG\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const cuerpo = pm.response.json();",
+                  "  pm.expect(cuerpo).to.have.all.keys(\"elementos\", \"pagina\", \"por_pagina\", \"total\");",
+                  "  pm.expect(cuerpo.elementos).to.be.an(\"array\");",
+                  "});",
+                  "pm.test(\"Cada recurso incluye consumible y disponibilidad\", () => {",
+                  "  pm.response.json().elementos.forEach((recurso) => {",
+                  "    pm.expect(recurso.consumible).to.be.a(\"boolean\");",
+                  "    pm.expect(recurso.disponible).to.be.at.least(0);",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Padrón de ONGs",
       "description": "Onboarding y estado de habilitación. Deja Cruz Roja Bahía Blanca suspendida, como estaba.",
       "item": [
         {
@@ -640,6 +894,124 @@
                   "  pm.expect(cuerpo.estado_habilitacion).to.eql(\"pendiente\");",
                   "  pm.expect(cuerpo.habilitada).to.eql(false);",
                   "  pm.collectionVariables.set(\"cuitNueva\", cuerpo.cuit);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cargar ítem al inventario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ongs/{{cuitNueva}}/inventario",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs",
+                "{{cuitNueva}}",
+                "inventario"
+              ]
+            },
+            "description": "Carga un ítem y su cantidad disponible. Ajustar itemId si la semilla usa otro identificador.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"item_id\": {{itemId}},\n  \"cantidad_disponible\": 100\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201 con el ítem cargado\", () => {",
+                  "  pm.response.to.have.status(201);",
+                  "  const cuerpo = pm.response.json();",
+                  "  pm.expect(cuerpo.item_id).to.eql(Number(pm.collectionVariables.get(\"itemId\")));",
+                  "  pm.expect(cuerpo.cantidad_disponible).to.eql(100);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cargar certificación y nivel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ongs/{{cuitNueva}}/certificaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs",
+                "{{cuitNueva}}",
+                "certificaciones"
+              ]
+            },
+            "description": "Asigna una certificación a la ONG nueva con el nivel informado.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"certificacion_id\": {{certificacionId}},\n  \"nivel_certificacion\": \"alta\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201 con la certificación cargada\", () => {",
+                  "  pm.response.to.have.status(201);",
+                  "  const cuerpo = pm.response.json();",
+                  "  pm.expect(cuerpo.certificacion_id).to.eql(Number(pm.collectionVariables.get(\"certificacionId\")));",
+                  "  pm.expect(cuerpo.nivel_certificacion).to.eql(\"alta\");",
                   "});"
                 ]
               }
@@ -1109,6 +1481,14 @@
     {
       "key": "cuitNueva",
       "value": ""
+    },
+    {
+      "key": "itemId",
+      "value": "1"
+    },
+    {
+      "key": "certificacionId",
+      "value": "1"
     }
   ]
 }

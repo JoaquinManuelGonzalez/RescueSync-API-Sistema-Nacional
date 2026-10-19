@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 from flask.views import MethodView
-from flask_smorest import Blueprint
 from sqlalchemy import func, select
 
+from app.core.acceso import Blueprint, Rol
+from app.core.errores import RespuestaError
 from app.extensiones import db
+from app.modulos.organizaciones import servicios
 from app.modulos.organizaciones.modelos import (
     Certificacion,
     Compromiso,
     CompromisoItem,
     EstadoCompromiso,
+    EstadoHabilitacion,
     InventarioItem,
     Item,
     Organizacion,
@@ -20,11 +23,15 @@ from app.modulos.organizaciones.modelos import (
 )
 from app.modulos.organizaciones.schemas import (
     CatalogoCertificacionesSchema,
+    CertificacionCargadaSchema,
     ConsultaDisponibilidadQuerySchema,
     ConsultaOrganizacionesQuerySchema,
     DisponibilidadPaginadaSchema,
+    InventarioCargadoSchema,
     OrganizacionesPaginadasSchema,
     PaginacionQuerySchema,
+    PeticionCargaCertificacionSchema,
+    PeticionCargaInventarioSchema,
 )
 
 blueprint_organizaciones = Blueprint(
@@ -45,6 +52,7 @@ def _datos_paginados(elementos: list, pagina: int, por_pagina: int, total: int) 
 
 @blueprint_organizaciones.route("/certificaciones")
 class CatalogoCertificaciones(MethodView):
+    @blueprint_organizaciones.requiere_rol(Rol.sistema, Rol.administrador)
     @blueprint_organizaciones.arguments(PaginacionQuerySchema, location="query")
     @blueprint_organizaciones.response(200, CatalogoCertificacionesSchema)
     def get(self, args):
@@ -71,6 +79,7 @@ class CatalogoCertificaciones(MethodView):
 
 @blueprint_organizaciones.route("/ongs")
 class OrganizacionesHabilitadas(MethodView):
+    @blueprint_organizaciones.requiere_rol(Rol.sistema, Rol.administrador)
     @blueprint_organizaciones.arguments(
         ConsultaOrganizacionesQuerySchema,
         location="query",
@@ -81,7 +90,7 @@ class OrganizacionesHabilitadas(MethodView):
         pagina = args["pagina"]
         por_pagina = args["por_pagina"]
         consulta = select(Organizacion).where(
-            Organizacion.activa.is_(True),
+            Organizacion.estado_habilitacion == EstadoHabilitacion.habilitada,
             Organizacion.tipo == TipoOrganizacion.ong,
         )
         if args["certificacion_id"] is not None:
@@ -106,6 +115,7 @@ class OrganizacionesHabilitadas(MethodView):
         elementos = [
             {
                 "id": organizacion.id,
+                "cuit": organizacion.identificador_nacional,
                 "nombre": organizacion.nombre,
                 "mail_contacto": organizacion.mail_contacto,
                 "certificaciones": [
@@ -124,6 +134,7 @@ class OrganizacionesHabilitadas(MethodView):
 
 @blueprint_organizaciones.route("/recursos/disponibilidad")
 class DisponibilidadGlobal(MethodView):
+    @blueprint_organizaciones.requiere_rol(Rol.sistema, Rol.administrador)
     @blueprint_organizaciones.arguments(
         ConsultaDisponibilidadQuerySchema,
         location="query",
@@ -161,6 +172,7 @@ class DisponibilidadGlobal(MethodView):
                 Item.nombre,
                 Item.tipo,
                 Item.unidad_medida,
+                Item.consumible,
                 total_subconsulta.c.total,
                 func.coalesce(comprometido_subconsulta.c.comprometido, 0).label("comprometido"),
             )
@@ -196,6 +208,7 @@ class DisponibilidadGlobal(MethodView):
                 "nombre": fila.nombre,
                 "tipo": fila.tipo.value,
                 "unidad_medida": fila.unidad_medida,
+                "consumible": fila.consumible,
                 "total": fila.total,
                 "comprometido": fila.comprometido,
                 "disponible": max(fila.total - fila.comprometido, 0),
@@ -203,3 +216,127 @@ class DisponibilidadGlobal(MethodView):
             for fila in filas
         ]
         return _datos_paginados(elementos, pagina, por_pagina, total)
+
+
+@blueprint_organizaciones.route("/ongs/<string:cuit>/recursos/disponibilidad")
+class DisponibilidadDeOrganizacion(MethodView):
+    @blueprint_organizaciones.requiere_rol(Rol.sistema, Rol.administrador)
+    @blueprint_organizaciones.arguments(
+        ConsultaDisponibilidadQuerySchema,
+        location="query",
+    )
+    @blueprint_organizaciones.response(200, DisponibilidadPaginadaSchema)
+    @blueprint_organizaciones.alt_response(404, schema=RespuestaError)
+    def get(self, args, cuit):
+        """Consultar la disponibilidad de recursos de una organización."""
+        organizacion = servicios.obtener_por_cuit(cuit)
+        pagina = args["pagina"]
+        por_pagina = args["por_pagina"]
+        total_subconsulta = (
+            select(
+                InventarioItem.item_id,
+                func.sum(InventarioItem.cantidad_disponible).label("total"),
+            )
+            .where(InventarioItem.inventario.has(organizacion_id=organizacion.id))
+            .group_by(InventarioItem.item_id)
+            .subquery()
+        )
+        comprometido_subconsulta = (
+            select(
+                InventarioItem.item_id,
+                func.sum(CompromisoItem.cantidad_comprometida).label("comprometido"),
+            )
+            .join(CompromisoItem, CompromisoItem.inventario_item_id == InventarioItem.id)
+            .join(
+                Compromiso,
+                (Compromiso.id == CompromisoItem.compromiso_id)
+                & (Compromiso.estado == EstadoCompromiso.comprometido),
+            )
+            .where(Compromiso.organizacion_id == organizacion.id)
+            .group_by(InventarioItem.item_id)
+            .subquery()
+        )
+        consulta = (
+            select(
+                Item.id,
+                Item.nombre,
+                Item.tipo,
+                Item.unidad_medida,
+                Item.consumible,
+                total_subconsulta.c.total,
+                func.coalesce(comprometido_subconsulta.c.comprometido, 0).label("comprometido"),
+            )
+            .join(total_subconsulta, total_subconsulta.c.item_id == Item.id)
+            .outerjoin(
+                comprometido_subconsulta,
+                comprometido_subconsulta.c.item_id == Item.id,
+            )
+        )
+        if args["tipo"] is not None:
+            consulta = consulta.where(Item.tipo == args["tipo"])
+
+        total = db.session.scalar(
+            select(func.count()).select_from(consulta.order_by(None).subquery())
+        ) or 0
+        filas = db.session.execute(
+            consulta.order_by(Item.nombre, Item.id)
+            .offset((pagina - 1) * por_pagina)
+            .limit(por_pagina)
+        ).all()
+        elementos = [
+            {
+                "id": fila.id,
+                "nombre": fila.nombre,
+                "tipo": fila.tipo.value,
+                "unidad_medida": fila.unidad_medida,
+                "consumible": fila.consumible,
+                "total": fila.total,
+                "comprometido": fila.comprometido,
+                "disponible": max(fila.total - fila.comprometido, 0),
+            }
+            for fila in filas
+        ]
+        return _datos_paginados(elementos, pagina, por_pagina, total)
+
+
+@blueprint_organizaciones.route("/ongs/<string:cuit>/inventario")
+class CargaDeInventario(MethodView):
+    @blueprint_organizaciones.requiere_rol(Rol.administrador)
+    @blueprint_organizaciones.arguments(PeticionCargaInventarioSchema)
+    @blueprint_organizaciones.response(201, InventarioCargadoSchema)
+    @blueprint_organizaciones.alt_response(404, schema=RespuestaError)
+    @blueprint_organizaciones.alt_response(409, schema=RespuestaError)
+    def post(self, datos, cuit):
+        """Cargar un ítem y su cantidad disponible en el inventario de una ONG."""
+        registro = servicios.cargar_item(
+            cuit, datos["item_id"], datos["cantidad_disponible"]
+        )
+        return {
+            "id": registro.id,
+            "item_id": registro.item_id,
+            "item_nombre": registro.item.nombre,
+            "cantidad_disponible": registro.cantidad_disponible,
+        }
+
+
+@blueprint_organizaciones.route("/ongs/<string:cuit>/certificaciones")
+class CargaDeCertificacion(MethodView):
+    @blueprint_organizaciones.requiere_rol(Rol.administrador)
+    @blueprint_organizaciones.arguments(PeticionCargaCertificacionSchema)
+    @blueprint_organizaciones.response(201, CertificacionCargadaSchema)
+    @blueprint_organizaciones.alt_response(404, schema=RespuestaError)
+    @blueprint_organizaciones.alt_response(409, schema=RespuestaError)
+    def post(self, datos, cuit):
+        """Asignar una certificación y su nivel a una ONG."""
+        asignacion = servicios.cargar_certificacion(
+            cuit,
+            datos["certificacion_id"],
+            datos["nivel_certificacion"],
+        )
+        return {
+            "id": asignacion.id,
+            "certificacion_id": asignacion.certificacion_id,
+            "certificacion_nombre": asignacion.certificacion.nombre,
+            "nivel_certificacion": asignacion.nivel_riesgo_permitido,
+            "fecha_emision": asignacion.fecha_emision,
+        }
