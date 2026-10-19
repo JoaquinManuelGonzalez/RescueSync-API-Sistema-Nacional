@@ -1,0 +1,1114 @@
+{
+  "info": {
+    "name": "RescueSync - API del Sistema Nacional",
+    "description": "Pruebas de la autenticación JWT y del padrón de ONGs. Elegir el entorno (local o render), completar contrasenaAdmin y clientSecretBonita, y correr la colección en orden (Run collection). Ver docs/contratos/autenticacion.md.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Autenticación",
+      "description": "POST /login en sus dos modos y GET /cuentas/yo. Correr primero: los logins guardan los tokens.",
+      "item": [
+        {
+          "name": "Login administrador (JSON)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "Login en JSON, el modo para Swagger, Postman y personas.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usuario\": \"{{usuarioAdmin}}\",\n  \"contrasena\": \"{{contrasenaAdmin}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200 con un token Bearer\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const cuerpo = pm.response.json();",
+                  "  pm.expect(cuerpo.token_type).to.eql(\"Bearer\");",
+                  "  pm.expect(cuerpo.expires_in).to.be.above(0);",
+                  "  pm.collectionVariables.set(\"tokenAdmin\", cuerpo.access_token);",
+                  "});",
+                  "pm.test(\"El token no se cachea\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"Cache-Control\")).to.eql(\"no-store\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Bonita (OAuth2 client credentials)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "El mismo pedido que hace el conector REST de Bonita en modo OAUTH2 (Client Credentials).",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientIdBonita}}",
+                  "type": "text"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{clientSecretBonita}}",
+                  "type": "text"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200 con un token Bearer\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.collectionVariables.set(\"tokenBonita\", pm.response.json().access_token);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login con contraseña incorrecta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "Mismo mensaje para usuario inexistente o contraseña incorrecta.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usuario\": \"{{usuarioAdmin}}\",\n  \"contrasena\": \"incorrecta\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401 NO_AUTENTICADO\", () => {",
+                  "  pm.response.to.have.status(401);",
+                  "  pm.expect(pm.response.json().error.codigo).to.eql(\"NO_AUTENTICADO\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login OAuth2 con secreto incorrecto",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "En modo OAuth2 los errores siguen el RFC 6749, como los espera el conector de Bonita.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientIdBonita}}",
+                  "type": "text"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "incorrecto",
+                  "type": "text"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401 invalid_client (RFC 6749)\", () => {",
+                  "  pm.response.to.have.status(401);",
+                  "  pm.expect(pm.response.json().error).to.eql(\"invalid_client\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cuenta del token (administrador)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cuentas/yo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cuentas",
+                "yo"
+              ]
+            },
+            "description": "Muestra la cuenta, el rol y el vencimiento del token.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Rol administrador\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().rol).to.eql(\"administrador\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cuenta del token (Bonita, con trazabilidad)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Usuario-Bonita",
+                "value": "operador@chascomus.test"
+              },
+              {
+                "key": "X-Bonita-Process-Instance-Id",
+                "value": "4021"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cuentas/yo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cuentas",
+                "yo"
+              ]
+            },
+            "description": "Bonita informa la persona y el caso del proceso. La API solo las acepta del rol sistema.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenBonita}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Rol sistema con trazabilidad\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const cuerpo = pm.response.json();",
+                  "  pm.expect(cuerpo.rol).to.eql(\"sistema\");",
+                  "  pm.expect(cuerpo.trazabilidad.usuario_bonita).to.eql(\"operador@chascomus.test\");",
+                  "  pm.expect(cuerpo.trazabilidad.caso_bonita).to.eql(\"4021\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Protección de los endpoints",
+      "description": "Pedidos rechazados: sin token, con token adulterado y con un rol sin permiso.",
+      "item": [
+        {
+          "name": "Sin token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ongs/30-99999999-4",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs",
+                "30-99999999-4"
+              ]
+            },
+            "description": "Sin encabezado Authorization: 401 token_ausente.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401 NO_AUTENTICADO\", () => {",
+                  "  pm.response.to.have.status(401);",
+                  "  pm.expect(pm.response.json().error.codigo).to.eql(\"NO_AUTENTICADO\");",
+                  "});",
+                  "pm.test(\"Motivo: token_ausente\", () => {",
+                  "  pm.expect(pm.response.json().error.detalle.motivo).to.eql(\"token_ausente\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token adulterado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ongs/30-99999999-4",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs",
+                "30-99999999-4"
+              ]
+            },
+            "description": "Se invierte la firma del token del administrador: la API detecta la alteración.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdulterado}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const partes = pm.collectionVariables.get(\"tokenAdmin\").split(\".\");",
+                  "partes[2] = partes[2].split(\"\").reverse().join(\"\");",
+                  "pm.collectionVariables.set(\"tokenAdulterado\", partes.join(\".\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 401 NO_AUTENTICADO\", () => {",
+                  "  pm.response.to.have.status(401);",
+                  "  pm.expect(pm.response.json().error.codigo).to.eql(\"NO_AUTENTICADO\");",
+                  "});",
+                  "pm.test(\"Motivo: token_invalido\", () => {",
+                  "  pm.expect(pm.response.json().error.detalle.motivo).to.eql(\"token_invalido\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bonita intenta dar de alta una ONG",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ongs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs"
+              ]
+            },
+            "description": "El alta es del administrador: el rol sistema recibe 403.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenBonita}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cuit\": \"30-71555444-2\",\n  \"nombre\": \"No se crea\",\n  \"mail_contacto\": \"no@se.crea\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403 PERMISO_DENEGADO\", () => {",
+                  "  pm.response.to.have.status(403);",
+                  "  pm.expect(pm.response.json().error.codigo).to.eql(\"PERMISO_DENEGADO\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bonita intenta suspender una ONG",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ongs/30-99999999-4/habilitacion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs",
+                "30-99999999-4",
+                "habilitacion"
+              ]
+            },
+            "description": "La habilitación es del administrador: el rol sistema recibe 403.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenBonita}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"habilitada\",\n  \"motivo\": \"No corresponde.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 403 PERMISO_DENEGADO\", () => {",
+                  "  pm.response.to.have.status(403);",
+                  "  pm.expect(pm.response.json().error.codigo).to.eql(\"PERMISO_DENEGADO\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Padrón de ONGs",
+      "description": "Onboarding y estado de habilitación. Deja Cruz Roja Bahía Blanca suspendida, como estaba.",
+      "item": [
+        {
+          "name": "Consultar ONG suspendida (Bonita)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ongs/30-99999999-4",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs",
+                "30-99999999-4"
+              ]
+            },
+            "description": "Cruz Roja Bahía Blanca está registrada pero suspendida: no puede ofertar.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenBonita}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Está suspendida y no puede ofertar\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const cuerpo = pm.response.json();",
+                  "  pm.expect(cuerpo.estado_habilitacion).to.eql(\"suspendida\");",
+                  "  pm.expect(cuerpo.habilitada).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alta de ONG (onboarding)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ongs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs"
+              ]
+            },
+            "description": "Registra una ONG nueva en estado pendiente. El CUIT se genera al azar en cada corrida.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cuit\": \"{{cuitNueva}}\",\n  \"nombre\": \"ONG de prueba {{cuitNueva}}\",\n  \"mail_contacto\": \"prueba+{{cuitNueva}}@ong.example\",\n  \"telefono_contacto\": \"+54 221 555-0000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let cuit = '30';",
+                  "for (let i = 0; i < 9; i++) { cuit += Math.floor(Math.random() * 10); }",
+                  "pm.collectionVariables.set(\"cuitNueva\", cuit);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201 pendiente\", () => {",
+                  "  pm.response.to.have.status(201);",
+                  "  const cuerpo = pm.response.json();",
+                  "  pm.expect(cuerpo.estado_habilitacion).to.eql(\"pendiente\");",
+                  "  pm.expect(cuerpo.habilitada).to.eql(false);",
+                  "  pm.collectionVariables.set(\"cuitNueva\", cuerpo.cuit);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alta duplicada (mismo CUIT)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ongs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs"
+              ]
+            },
+            "description": "Control de duplicados por identificador fiscal: 409.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cuit\": \"{{cuitNueva}}\",\n  \"nombre\": \"Otro nombre {{cuitNueva}}\",\n  \"mail_contacto\": \"otro+{{cuitNueva}}@ong.example\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409 CONFLICTO_DE_ESTADO\", () => {",
+                  "  pm.response.to.have.status(409);",
+                  "  pm.expect(pm.response.json().error.codigo).to.eql(\"CONFLICTO_DE_ESTADO\");",
+                  "});",
+                  "pm.test(\"El campo duplicado es el CUIT\", () => {",
+                  "  pm.expect(pm.response.json().error.detalle.campo).to.eql(\"cuit\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alta con CUIT inválido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ongs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs"
+              ]
+            },
+            "description": "El CUIT tiene que tener 11 dígitos: 400.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cuit\": \"30-123\",\n  \"nombre\": \"CUIT inválido\",\n  \"mail_contacto\": \"cuit@invalido.example\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400 SOLICITUD_INVALIDA\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().error.codigo).to.eql(\"SOLICITUD_INVALIDA\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Habilitar la ONG nueva",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ongs/{{cuitNueva}}/habilitacion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs",
+                "{{cuitNueva}}",
+                "habilitacion"
+              ]
+            },
+            "description": "pendiente → habilitada.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"habilitada\",\n  \"motivo\": \"Documentación verificada.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Queda habilitada\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().estado_habilitacion).to.eql(\"habilitada\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Habilitarla otra vez",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ongs/{{cuitNueva}}/habilitacion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs",
+                "{{cuitNueva}}",
+                "habilitacion"
+              ]
+            },
+            "description": "Pedir el mismo estado es un conflicto: 409 con las transiciones permitidas.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"habilitada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 409 CONFLICTO_DE_ESTADO\", () => {",
+                  "  pm.response.to.have.status(409);",
+                  "  pm.expect(pm.response.json().error.codigo).to.eql(\"CONFLICTO_DE_ESTADO\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Suspender sin motivo",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ongs/{{cuitNueva}}/habilitacion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs",
+                "{{cuitNueva}}",
+                "habilitacion"
+              ]
+            },
+            "description": "Suspender exige un motivo: 400.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"suspendida\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400 SOLICITUD_INVALIDA\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().error.codigo).to.eql(\"SOLICITUD_INVALIDA\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rehabilitar Cruz Roja",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ongs/30-99999999-4/habilitacion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs",
+                "30-99999999-4",
+                "habilitacion"
+              ]
+            },
+            "description": "suspendida → habilitada.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"habilitada\",\n  \"motivo\": \"Certificación sanitaria renovada.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Queda habilitada\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().habilitada).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Volver a suspender Cruz Roja",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ongs/30-99999999-4/habilitacion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs",
+                "30-99999999-4",
+                "habilitacion"
+              ]
+            },
+            "description": "habilitada → suspendida. Deja los datos de demostración como estaban.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"suspendida\",\n  \"motivo\": \"Certificación sanitaria vencida (dato de demostración).\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Queda suspendida\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().estado_habilitacion).to.eql(\"suspendida\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Historial de habilitación de Cruz Roja",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ongs/30-99999999-4/habilitacion/historial",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs",
+                "30-99999999-4",
+                "habilitacion",
+                "historial"
+              ]
+            },
+            "description": "Cada cambio de estado, con la cuenta que lo hizo.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenBonita}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Registra los cambios\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const registros = pm.response.json().registros;",
+                  "  pm.expect(registros.length).to.be.above(2);",
+                  "  pm.expect(registros[registros.length - 1].estado_nuevo).to.eql(\"suspendida\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "tokenAdmin",
+      "value": ""
+    },
+    {
+      "key": "tokenBonita",
+      "value": ""
+    },
+    {
+      "key": "tokenAdulterado",
+      "value": ""
+    },
+    {
+      "key": "cuitNueva",
+      "value": ""
+    }
+  ]
+}

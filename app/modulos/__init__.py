@@ -2,33 +2,39 @@
 
 Cada modulo de dominio (habilitaciones, reservas, compromisos...) expone su blueprint en
 `rutas.py` y sus modelos en `modelos.py`. Este archivo es el unico lugar donde se los enchufa a
-la aplicacion y a Alembic. Por ahora no hay ninguno: los agregan las epicas siguientes.
+la aplicacion y a Alembic.
 """
 
 from __future__ import annotations
 
 from flask import Flask
-from flask_smorest import Api
 
+from app.core.openapi import Api
+from app.modulos.autenticacion.comandos import grupo_cuentas
 from app.modulos.autenticacion.rutas import blueprint_autenticacion
+from app.modulos.organizaciones.rutas_padron import blueprint_padron
 from app.modulos.organizaciones.rutas import blueprint_organizaciones
 
 
 def registrar_modulos(app: Flask, api: Api) -> None:  # noqa: ARG001
     """Registra el blueprint de cada modulo de dominio.
 
-    Ejemplo, cuando exista el modulo de compromisos:
+    Los blueprints son los de `app.core.acceso` (flask-smorest con autorizacion por rol) y se
+    registran con `api.register_blueprint`, NO con `app.register_blueprint`: asi aparecen en
+    la documentacion OpenAPI. La api se crea en create_app y llega como parametro. Ejemplo:
 
         from app.modulos.compromisos.rutas import blueprint_compromisos
 
-        app.register_blueprint(blueprint_compromisos)
-
-        Importante: Para registrar el Blueprint de flask-smorest
-        usar api.register_blueprint, NO app.register_blueprint.
-        La api en sí se crea en create_app, el constructor de la misma se pasa como parámetro.
+        api.register_blueprint(blueprint_compromisos)
     """
 
     api.register_blueprint(blueprint_autenticacion)
+    api.register_blueprint(blueprint_padron)
+
+
+def registrar_comandos(app: Flask) -> None:
+    """Registra los comandos de consola de los modulos (`flask <grupo> <comando>`)."""
+    app.cli.add_command(grupo_cuentas)
     api.register_blueprint(blueprint_organizaciones)
 
 
@@ -41,4 +47,5 @@ def importar_modelos() -> None:
 
         import app.modulos.compromisos.modelos  # noqa: F401
     """
+    import app.modulos.autenticacion.modelos  # noqa: F401
     import app.modulos.organizaciones.modelos  # noqa: F401

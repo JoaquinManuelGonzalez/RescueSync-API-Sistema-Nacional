@@ -65,6 +65,7 @@ jobs:
           {
             echo "APP_ENV=local"
             echo "SECRET_KEY=$(openssl rand -hex 32)"
+            echo "JWT_SECRET_KEY=$(openssl rand -hex 32)"
             echo "PORT=8000"
             echo "LOG_LEVEL=INFO"
             echo "POSTGRES_USER=sistema_nacional"
@@ -91,6 +92,7 @@ jobs:
           docker run -d --name api-produccion \
             --network rescuesync-sistema-nacional_default \
             -e APP_ENV=produccion -e PORT=10000 -e SECRET_KEY="$SECRET_KEY" \
+            -e JWT_SECRET_KEY="$JWT_SECRET_KEY" \
             -e DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}" \
             -p 10000:10000 sistema-nacional:ci
           for _ in $(seq 1 30); do

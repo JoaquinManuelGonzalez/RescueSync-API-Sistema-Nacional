@@ -13,10 +13,12 @@ RescueSync, reducido a lo que usa la API.
 | Variable | Obligatoria (S/N) | Valor por defecto | Descripción | En Render |
 |---|---|---|---|---|
 | `SECRET_KEY` | S | — | Clave secreta de Flask | Generada por Render (`generateValue: true`) |
+| `JWT_SECRET_KEY` | S | — | Clave con la que se firman los JWT (HS256). Mínimo 32 caracteres y distinta de `SECRET_KEY`. Rotarla invalida los tokens vigentes ([autenticación](autenticacion.md)) | Generada por Render (`generateValue: true`) |
 | `DATABASE_URL` | S | — | Cadena de conexión a PostgreSQL. Acepta `postgres://`, `postgresql://` o `postgresql+psycopg://`; la aplicación la normaliza al driver psycopg 3 | URI del Session pooler de Supabase, cargada a mano en el dashboard (`sync: false`) |
 | `APP_ENV` | N | `local` | Entorno de ejecución (`local`, `evaluacion`, `produccion`). En `produccion` se activa `ProxyFix` para el balanceador de Render | `produccion` |
 | `PORT` | N | `8000` | Puerto en el que escucha la aplicación dentro del contenedor | Lo inyecta Render (`10000`) |
 | `LOG_LEVEL` | N | `INFO` | Nivel mínimo de log (`DEBUG`, `INFO`, `WARN`, `ERROR`) | `INFO` |
+| `JWT_EXPIRACION_MINUTOS` | N | `60` | Vida de los tokens que emite `/login`, entre 1 y 1440 minutos. El conector de Bonita pide uno nuevo antes del vencimiento | `60` |
 | `DATABASE_SSLMODE` | N | (vacío) | Si tiene valor, se agrega como `sslmode` a la URL de la base. Vacío para el PostgreSQL local | `require` (la conexión a Supabase viaja por internet) |
 
 ### Leídas por la infraestructura (nunca por la aplicación)
@@ -32,7 +34,8 @@ RescueSync, reducido a lo que usa la API.
 ## 2. Arranque en modo "fail fast"
 
 La aplicación valida las variables obligatorias al construirse (app factory), antes de aceptar
-solicitudes. Si falta una, está vacía, o `PORT` / `DATABASE_URL` tienen un formato inválido:
+solicitudes. Si falta una, está vacía, `PORT` / `JWT_EXPIRACION_MINUTOS` / `DATABASE_URL` tienen
+un formato inválido o `JWT_SECRET_KEY` tiene menos de 32 caracteres:
 
 1. Registra un evento `configuracion_invalida` de nivel `ERROR` por cada problema, sin loguear
    el valor de ninguna variable, y repite el mensaje en texto plano en `stderr`.
@@ -55,12 +58,18 @@ corriendo `docker compose up api`.
 ## 4. Gestión de secretos
 
 - **Ningún secreto se versiona.** `.env` y cualquier `.env.*` (salvo `.env.example`) están en
-  `.gitignore`. `render.yaml` no contiene valores secretos: `SECRET_KEY` la genera Render y
+  `.gitignore`. `render.yaml` no contiene valores secretos: `SECRET_KEY` y `JWT_SECRET_KEY` las
+  genera Render y
   `DATABASE_URL` (que incluye la contraseña de la base de Supabase) se carga a mano en
   **Service → Environment** del dashboard de Render.
-- **Secretos futuros** (credenciales de Bonita, claves JWT) se declaran en `render.yaml` con
-  `sync: false`. Render los pide solo al crear el Blueprint por primera vez; si se agregan
-  después, se cargan a mano en **Service → Environment** del dashboard.
+- **Secretos que no se pueden generar** se declaran en `render.yaml` con `sync: false`. Render
+  los pide solo al crear el Blueprint por primera vez; si se agregan después, se cargan a mano en
+  **Service → Environment** del dashboard. Una variable nueva con `generateValue: true` (como
+  `JWT_SECRET_KEY`) la crea Render al sincronizar el Blueprint, si todavía no existe.
+- **Credenciales de las cuentas de la API** (la de Bonita y la del administrador) no son
+  variables de entorno: viven hasheadas en la tabla `cuentas` y se crean con `flask cuentas`
+  ([autenticación](autenticacion.md), sección 8). El secreto de Bonita se carga en el parámetro
+  `snClientSecret` del proceso.
 - **`.env.supabase`** (opcional, solo para quien administra la base): archivo local con la
   `DATABASE_URL` de Supabase, para comandos puntuales contra la nube con `docker run
   --env-file`. Lo ignoran git y Docker (`.env.*`). No reemplaza al `.env`.

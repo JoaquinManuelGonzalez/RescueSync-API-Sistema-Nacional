@@ -11,6 +11,8 @@ from app.modulos.organizaciones.modelos import (
     Compromiso,
     CompromisoItem,
     EstadoCompromiso,
+    EstadoHabilitacion,
+    HistorialHabilitacion,
     Inventario,
     InventarioItem,
     Item,
@@ -37,7 +39,6 @@ def crear_organizacion(**valores):
         "tipo": TipoOrganizacion.ong,
         "nombre": "Rescate Solidario",
         "mail_contacto": "contacto@rescate.example",
-        "password_hash": "hash-de-prueba",
     }
     datos.update(valores)
     return Organizacion(**datos)
@@ -203,3 +204,26 @@ def test_inventario_rechaza_cantidades_invalidas(
         db.session.commit()
 
     db.session.rollback()
+
+
+def test_organizacion_nueva_queda_pendiente(base_de_datos):
+    organizacion = crear_organizacion()
+    db.session.add(organizacion)
+    db.session.commit()
+
+    assert organizacion.estado_habilitacion is EstadoHabilitacion.pendiente
+
+
+def test_al_eliminar_una_organizacion_se_elimina_su_historial(base_de_datos):
+    organizacion = crear_organizacion(
+        historial_habilitacion=[
+            HistorialHabilitacion(estado_nuevo=EstadoHabilitacion.pendiente, motivo="Alta.")
+        ]
+    )
+    db.session.add(organizacion)
+    db.session.commit()
+
+    db.session.delete(organizacion)
+    db.session.commit()
+
+    assert db.session.query(HistorialHabilitacion).count() == 0

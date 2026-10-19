@@ -3,10 +3,12 @@
 API del Sistema Nacional creada para el proyecto RescueSync de la materia Desarrollo de Software
 en Sistemas Distribuidos. Responde la habilitación de ONGs y gestiona la reserva y el compromiso
 de recursos. Corre dockerizada, en local con `docker compose` y en la nube en Render, con la base
-PostgreSQL en Supabase.
+PostgreSQL en Supabase. Se autentica con JWT
+([`docs/contratos/autenticacion.md`](docs/contratos/autenticacion.md)).
 
 **URL pública:** `https://rescuesync-sistema-nacional.onrender.com`
-(salud: [`/health`](https://rescuesync-sistema-nacional.onrender.com/health))
+(salud: [`/health`](https://rescuesync-sistema-nacional.onrender.com/health), Swagger:
+[`/docs`](https://rescuesync-sistema-nacional.onrender.com/docs))
 
 > **Único consumidor: Bonita.** La aplicación web de RescueSync **nunca** llama a esta API
 > directamente: toda interacción pasa por el proceso de Bonita, que la invoca con conectores
@@ -25,13 +27,14 @@ Aplicación web ──► Bonita (proceso BPMN) ──► API del Sistema Nacion
 3. [Mapa del repositorio](#mapa-del-repositorio)
 4. [Variables de entorno](#variables-de-entorno)
 5. [Comandos frecuentes](#comandos-frecuentes)
-6. [Despliegue en Render](#despliegue-en-render)
-7. [Base de datos: local y nube](#base-de-datos-local-y-nube)
-8. [Límites de los planes Free y runbooks](#límites-de-los-planes-free-y-runbooks)
-9. [Integración con Bonita](#integración-con-bonita)
-10. [Problemas conocidos](#problemas-conocidos)
-11. [Documentación](#documentación)
-12. [Registro de validación](#registro-de-validación)
+6. [Autenticación y prueba con Swagger y Postman](#autenticación-y-prueba-con-swagger-y-postman)
+7. [Despliegue en Render](#despliegue-en-render)
+8. [Base de datos: local y nube](#base-de-datos-local-y-nube)
+9. [Límites de los planes Free y runbooks](#límites-de-los-planes-free-y-runbooks)
+10. [Integración con Bonita](#integración-con-bonita)
+11. [Problemas conocidos](#problemas-conocidos)
+12. [Documentación](#documentación)
+13. [Registro de validación](#registro-de-validación)
 
 ## Puesta en marcha
 
@@ -59,7 +62,7 @@ git clone https://github.com/JoaquinManuelGonzalez/RescueSync-API-Sistema-Nacion
 cd RescueSync-API-Sistema-Nacional
 ```
 
-1. **Crear el `.env`** a partir de la plantilla y completar los tres valores vacíos:
+1. **Crear el `.env`** a partir de la plantilla y completar los cuatro valores vacíos:
 
    ```bash
    cp .env.example .env
@@ -67,6 +70,8 @@ cd RescueSync-API-Sistema-Nacional
 
    - `SECRET_KEY`: cualquier cadena larga. Para generar una:
      `python -c "import secrets; print(secrets.token_urlsafe(32))"`
+   - `JWT_SECRET_KEY`: otra cadena distinta, de al menos 32 caracteres:
+     `python -c "import secrets; print(secrets.token_urlsafe(48))"`
    - `POSTGRES_PASSWORD`: cualquier contraseña (es la del PostgreSQL local).
    - En `DATABASE_URL`, reemplazar `CAMBIAR` por esa misma contraseña.
 
@@ -85,6 +90,15 @@ cd RescueSync-API-Sistema-Nacional
 
 `docker compose ps` tiene que mostrar `db` y `api` como `healthy`. Las migraciones se aplican
 solas al arrancar el contenedor `api`.
+
+Para usar los endpoints hace falta una cuenta. La primera vez, cargar los datos semilla y crear
+las dos cuentas de prueba ([autenticación](#autenticación-y-prueba-con-swagger-y-postman)):
+
+```bash
+docker compose exec api flask seed
+docker compose exec api flask cuentas crear admin-sn --rol administrador   # pide la contraseña
+docker compose exec api flask cuentas crear bonita-rescuesync --rol sistema --generar
+```
 
 ### Alternativa: API fuera del contenedor (con uv)
 
@@ -126,6 +140,7 @@ uv run flask --app app.wsgi:app run --debug --port 8000
 | Supabase (base de datos) | plan Free, `us-east-1` | dashboard de Supabase (ADR-004) |
 | marshmallow | 4.3.1 | `pyproject.toml` / `uv.lock` |
 | flask-smorest | 0.47.0 | `pyproject.toml` / `uv.lock` |
+| flask-jwt-extended / PyJWT | 4.7.4 / 2.15.1 | `pyproject.toml` / `uv.lock` (ADR-005) |
 
 ## Mapa del repositorio
 
@@ -133,18 +148,23 @@ uv run flask --app app.wsgi:app run --debug --port 8000
 app/                    código de la API
   __init__.py           app factory create_app()
   wsgi.py               objeto que levantan flask y gunicorn (app.wsgi:app)
-  extensiones.py        db y migrate
-  core/                 configuracion, errores, logging, salud (/health)
-  modulos/              módulos de dominio (organizaciones e inventarios iniciales)
+  extensiones.py        db, migrate y jwt
+  core/                 configuracion, errores, logging, salud (/health),
+                        acceso (JWT, roles, Blueprint protegido), openapi (Swagger)
+  modulos/              módulos de dominio:
+    autenticacion/      /login, /cuentas/yo, tabla cuentas y comandos `flask cuentas`
+    organizaciones/     padrón de ONGs (/ongs), estados de habilitación e inventarios
 migrations/             migraciones de Alembic (0001: línea base;
                         f5b04d297d15: organizaciones e inventarios;
                         c7a8f1d2e3b4: certificaciones;
                         d026ce7dc122: compromisos de recursos;
                         462daf0d4c41: consumible y ajuste de cantidades;
-                        a63f9d20bc41: alineación con el diagrama)
+                        a63f9d20bc41: alineación con el diagrama;
+                        b8e41c7d2f90: cuentas y estado de habilitación)
 tests/                  tests con pytest (SQLite en memoria)
 docs/adr/               decisiones de arquitectura
-docs/contratos/         contratos de configuración, errores y logging
+docs/contratos/         contratos de autenticación, configuración, errores y logging
+docs/postman/           colección y entornos de Postman
 .github/workflows/ci.yml  CI: calidad (ruff, pytest, render.yaml) + imagen (smoke tests)
 Dockerfile              imagen multi-stage: desarrollo / produccion (por defecto)
 entrypoint.sh           aplica migraciones y arranca el servidor
@@ -161,6 +181,8 @@ Detalle completo en [`docs/contratos/configuracion.md`](docs/contratos/configura
 | Variable | Obligatoria | Ejemplo | Descripción |
 |---|---|---|---|
 | `SECRET_KEY` | Sí | (cadena aleatoria) | Clave secreta de Flask |
+| `JWT_SECRET_KEY` | Sí | (cadena aleatoria, 32+ caracteres) | Clave con la que se firman los JWT |
+| `JWT_EXPIRACION_MINUTOS` | No | `60` | Vida de los tokens de `/login` (1 a 1440) |
 | `DATABASE_URL` | Sí | `postgresql+psycopg://sistema_nacional:clave@db:5432/sistema_nacional` | Conexión a PostgreSQL. En local, la base `db`; en Render, la URI del Session pooler de Supabase |
 | `APP_ENV` | No | `local` | `local`, `evaluacion` o `produccion` |
 | `PORT` | No | `8000` | Puerto de la API (Render inyecta `10000`) |
@@ -184,6 +206,7 @@ docker compose down -v                  # detener y BORRAR la base local
 docker compose exec api flask db upgrade                 # aplicar migraciones a mano
 docker compose exec api flask db migrate -m "mensaje"    # generar una migración
 docker compose exec api flask seed                       # cargar datos semilla idempotentes
+docker compose exec api flask cuentas listar             # cuentas que pueden pedir tokens
 docker compose exec api pytest                           # tests dentro del contenedor
 docker compose exec api ruff check .                     # linter dentro del contenedor
 
@@ -196,6 +219,36 @@ Con uv instalado, la verificación previa a cada commit es:
 ```bash
 uv run ruff format --check . && uv run ruff check . && uv run pytest
 ```
+
+## Autenticación y prueba con Swagger y Postman
+
+Todo endpoint, salvo `/login`, `/health`, `/docs` y `/openapi.json`, exige un JWT. El detalle
+(claims, roles, errores, configuración de Bonita) está en
+[`docs/contratos/autenticacion.md`](docs/contratos/autenticacion.md).
+
+| Cuenta | Rol | Para qué |
+|---|---|---|
+| `admin-sn` | `administrador` | Dar de alta ONGs y cambiar su habilitación (Swagger, Postman) |
+| `bonita-rescuesync` | `sistema` | Los conectores REST del proceso de Bonita |
+
+Las credenciales de la nube no están en el repositorio: van en el documento de la entrega.
+
+**Swagger** (`/docs`):
+
+1. `POST /login` → *Try it out* con `{"usuario": "admin-sn", "contrasena": "..."}`.
+2. Copiar el `access_token` y pegarlo en *Authorize* → `bearerAuth`. O directamente
+   *Authorize* → `oauth2` con el usuario como *client_id* y la contraseña como *client_secret*.
+3. Probar los endpoints. El token dura una hora y sobrevive a recargar la página.
+
+**Postman**: importar `docs/postman/sistema-nacional.postman_collection.json` y el entorno
+`local` o `render` de la misma carpeta, completar las credenciales del entorno y correr la
+colección en orden. Los dos logins guardan sus tokens en variables y los demás pedidos muestran
+los casos de la épica: 401 sin token o con token adulterado, 403 por rol, alta de una ONG, 409 por
+CUIT duplicado y la ONG suspendida que se vuelve a habilitar.
+
+Datos de demostración del padrón: las mismas organizaciones y CUIT que la aplicación web, todas
+`habilitada` salvo **Cruz Roja Argentina - Filial Bahía Blanca** (`30-99999999-4`), que está
+`suspendida` para mostrar el caso de una ONG que no puede ofertar.
 
 ## Despliegue en Render
 
@@ -351,10 +404,12 @@ docker build -t sistema-nacional:local .
 
 # Revisión de Alembic aplicada en Supabase
 docker run --rm --env-file .env.supabase -e SECRET_KEY=x -e DATABASE_SSLMODE=require \
+  -e JWT_SECRET_KEY=solo-para-comandos-de-consola-sin-tokens \
   --entrypoint flask sistema-nacional:local db current
 
 # Historial de migraciones que conoce el código
 docker run --rm --env-file .env.supabase -e SECRET_KEY=x -e DATABASE_SSLMODE=require \
+  -e JWT_SECRET_KEY=solo-para-comandos-de-consola-sin-tokens \
   --entrypoint flask sistema-nacional:local db history
 
 # Consola psql contra Supabase (sin instalar nada)
@@ -362,7 +417,30 @@ docker run --rm -it --env-file .env.supabase postgres:17-trixie \
   sh -c 'psql "$DATABASE_URL?sslmode=require"'
 ```
 
-`--entrypoint flask` saltea el `entrypoint.sh`: el comando no aplica migraciones.
+`--entrypoint flask` saltea el `entrypoint.sh`: el comando no aplica migraciones. La
+`JWT_SECRET_KEY` de esos comandos es cualquier cadena de 32+ caracteres: la consola no firma
+tokens, y los que emite la API en Render se firman con la clave que generó Render.
+
+### Runbook: crear cuentas en Supabase
+
+Las cuentas de la nube se crean una sola vez desde la PC, con la imagen del commit desplegado.
+`-it` hace falta para que `crear` pueda pedir la contraseña:
+
+```bash
+docker run --rm -it --env-file .env.supabase -e SECRET_KEY=x -e DATABASE_SSLMODE=require \
+  -e JWT_SECRET_KEY=solo-para-comandos-de-consola-sin-tokens \
+  --entrypoint flask sistema-nacional:local \
+  cuentas crear admin-sn --rol administrador --descripcion "Operador del Sistema Nacional"
+
+docker run --rm -it --env-file .env.supabase -e SECRET_KEY=x -e DATABASE_SSLMODE=require \
+  -e JWT_SECRET_KEY=solo-para-comandos-de-consola-sin-tokens \
+  --entrypoint flask sistema-nacional:local \
+  cuentas crear bonita-rescuesync --rol sistema --descripcion "Motor Bonita de RescueSync" --generar
+```
+
+El secreto generado para Bonita se muestra una sola vez: cargarlo en el parámetro
+`snClientSecret` del proceso. Volver a correr `crear` sobre una cuenta existente rota su
+contraseña.
 
 ### El archivo `.env.supabase`
 
@@ -442,8 +520,12 @@ proceso:
   (reintentar).
 - Por el spin-down del plan Free, el primer llamado puede superar el timeout del conector:
   despertar el servicio antes de ejecutar el proceso.
-- Los endpoints de negocio que va a consumir Bonita (habilitación, reserva y compromiso de
-  recursos) llegan en las épicas siguientes.
+- **Autenticación**: cada conector REST usa el modo **OAUTH2 (Client Credentials)** con Token
+  Endpoint `urlSistemaNacional + "/login"` y los parámetros `snClientId` / `snClientSecret`. El
+  conector pide y renueva el token solo. Pasos completos en la sección 7 de
+  [`docs/contratos/autenticacion.md`](docs/contratos/autenticacion.md).
+- Los endpoints de negocio que va a consumir Bonita (evaluación, reserva y compromiso de
+  recursos) llegan en las épicas siguientes. El padrón (`GET /ongs/{cuit}`) ya está disponible.
 
 ## Problemas conocidos
 
@@ -456,7 +538,8 @@ proceso:
    Bonita).
 3. **El contenedor `api` termina enseguida.** Mirar `docker compose logs api`: casi siempre es
    una variable obligatoria faltante (fail-fast) o una contraseña de `DATABASE_URL` que no
-   coincide con `POSTGRES_PASSWORD`.
+   coincide con `POSTGRES_PASSWORD`. Un `.env` creado antes de la EPIC-61 no tiene
+   `JWT_SECRET_KEY`: agregarla (ver `.env.example`).
 4. **Cambié `POSTGRES_PASSWORD` y ahora la API no conecta.** PostgreSQL solo toma las
    credenciales al crear el volumen. Para empezar de cero: `docker compose down -v`.
    Lo mismo si `db` no arranca después de un cambio de versión de PostgreSQL en
@@ -478,10 +561,12 @@ proceso:
 | Documento | Contenido |
 |---|---|
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Convenciones de código, ramas, commits, flujo de épica, pase a `main` y despliegue continuo |
-| [`docs/adr/`](docs/adr/README.md) | ADR-001 framework, ADR-002 plataforma cloud (Render), ADR-003 contenedores y migraciones, ADR-004 base de datos en Supabase |
+| [`docs/adr/`](docs/adr/README.md) | ADR-001 framework, ADR-002 plataforma cloud (Render), ADR-003 contenedores y migraciones, ADR-004 base de datos en Supabase, ADR-005 autenticación JWT con cuentas de cliente |
+| [`docs/contratos/autenticacion.md`](docs/contratos/autenticacion.md) | Login, token, roles, permisos, trazabilidad y guía de configuración de Bonita |
 | [`docs/contratos/configuracion.md`](docs/contratos/configuracion.md) | Variables de entorno, fail-fast y gestión de secretos |
 | [`docs/contratos/errores.md`](docs/contratos/errores.md) | Envelope de error y qué significa cada código para Bonita |
 | [`docs/contratos/logging.md`](docs/contratos/logging.md) | Formato JSON de logs e id de correlación |
+| [`docs/postman/`](docs/postman) | Colección y entornos de Postman para probar la API |
 
 ## Registro de validación
 
