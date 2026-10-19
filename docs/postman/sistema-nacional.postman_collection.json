@@ -717,8 +717,7 @@
               }
             }
           ]
-        }
-        ,
+        },
         {
           "name": "Disponibilidad de una ONG",
           "request": {
@@ -784,122 +783,9 @@
       ]
     },
     {
-      "name": "4. Padrón de ONGs",
-      "description": "Onboarding y estado de habilitación. Deja Cruz Roja Bahía Blanca suspendida, como estaba.",
+      "name": "4. Gestión de organizaciones",
+      "description": "Carga de inventario y certificaciones de una organizaci?n. Requiere el rol administrador.",
       "item": [
-        {
-          "name": "Consultar ONG suspendida (Bonita)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/ongs/30-99999999-4",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "ongs",
-                "30-99999999-4"
-              ]
-            },
-            "description": "Cruz Roja Bahía Blanca está registrada pero suspendida: no puede ofertar.",
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{tokenBonita}}",
-                  "type": "string"
-                }
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Está suspendida y no puede ofertar\", () => {",
-                  "  pm.response.to.have.status(200);",
-                  "  const cuerpo = pm.response.json();",
-                  "  pm.expect(cuerpo.estado_habilitacion).to.eql(\"suspendida\");",
-                  "  pm.expect(cuerpo.habilitada).to.eql(false);",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Alta de ONG (onboarding)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/ongs",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "ongs"
-              ]
-            },
-            "description": "Registra una ONG nueva en estado pendiente. El CUIT se genera al azar en cada corrida.",
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{tokenAdmin}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"cuit\": \"{{cuitNueva}}\",\n  \"nombre\": \"ONG de prueba {{cuitNueva}}\",\n  \"mail_contacto\": \"prueba+{{cuitNueva}}@ong.example\",\n  \"telefono_contacto\": \"+54 221 555-0000\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "let cuit = '30';",
-                  "for (let i = 0; i < 9; i++) { cuit += Math.floor(Math.random() * 10); }",
-                  "pm.collectionVariables.set(\"cuitNueva\", cuit);"
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Responde 201 pendiente\", () => {",
-                  "  pm.response.to.have.status(201);",
-                  "  const cuerpo = pm.response.json();",
-                  "  pm.expect(cuerpo.estado_habilitacion).to.eql(\"pendiente\");",
-                  "  pm.expect(cuerpo.habilitada).to.eql(false);",
-                  "  pm.collectionVariables.set(\"cuitNueva\", cuerpo.cuit);",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
         {
           "name": "Cargar ítem al inventario",
           "request": {
@@ -1012,6 +898,181 @@
                   "  const cuerpo = pm.response.json();",
                   "  pm.expect(cuerpo.certificacion_id).to.eql(Number(pm.collectionVariables.get(\"certificacionId\")));",
                   "  pm.expect(cuerpo.nivel_certificacion).to.eql(\"alta\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Nivel de certificación inválido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ongs/{{cuitNueva}}/certificaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs",
+                "{{cuitNueva}}",
+                "certificaciones"
+              ]
+            },
+            "description": "El nivel solo acepta baja, media, alta o crítica. Los valores históricos como ALTO se rechazan.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"certificacion_id\": {{certificacionId}},\n  \"nivel_certificacion\": \"ALTO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400 por nivel inválido\", () => {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Padrón de ONGs",
+      "description": "Onboarding y estado de habilitación. Deja Cruz Roja Bahía Blanca suspendida, como estaba.",
+      "item": [
+        {
+          "name": "Consultar ONG suspendida (Bonita)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/ongs/30-99999999-4",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs",
+                "30-99999999-4"
+              ]
+            },
+            "description": "Cruz Roja Bahía Blanca está registrada pero suspendida: no puede ofertar.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenBonita}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Está suspendida y no puede ofertar\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const cuerpo = pm.response.json();",
+                  "  pm.expect(cuerpo.estado_habilitacion).to.eql(\"suspendida\");",
+                  "  pm.expect(cuerpo.habilitada).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alta de ONG (onboarding)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ongs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs"
+              ]
+            },
+            "description": "Registra una ONG nueva en estado pendiente. El CUIT se genera al azar en cada corrida.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cuit\": \"{{cuitNueva}}\",\n  \"nombre\": \"ONG de prueba {{cuitNueva}}\",\n  \"mail_contacto\": \"prueba+{{cuitNueva}}@ong.example\",\n  \"telefono_contacto\": \"+54 221 555-0000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let cuit = '30';",
+                  "for (let i = 0; i < 9; i++) { cuit += Math.floor(Math.random() * 10); }",
+                  "pm.collectionVariables.set(\"cuitNueva\", cuit);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201 pendiente\", () => {",
+                  "  pm.response.to.have.status(201);",
+                  "  const cuerpo = pm.response.json();",
+                  "  pm.expect(cuerpo.estado_habilitacion).to.eql(\"pendiente\");",
+                  "  pm.expect(cuerpo.habilitada).to.eql(false);",
+                  "  pm.collectionVariables.set(\"cuitNueva\", cuerpo.cuit);",
                   "});"
                 ]
               }
