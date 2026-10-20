@@ -8,12 +8,10 @@ from sqlalchemy import func, select
 from app.core.acceso import Blueprint, Rol
 from app.core.errores import RespuestaError
 from app.extensiones import db
+from app.modulos.compromisos.modelos import Compromiso, CompromisoItem, EstadoCompromiso
 from app.modulos.organizaciones import servicios
 from app.modulos.organizaciones.modelos import (
     Certificacion,
-    Compromiso,
-    CompromisoItem,
-    EstadoCompromiso,
     EstadoHabilitacion,
     InventarioItem,
     Item,

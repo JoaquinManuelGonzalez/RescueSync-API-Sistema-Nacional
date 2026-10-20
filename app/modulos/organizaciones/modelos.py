@@ -26,6 +26,7 @@ from app.extensiones import db
 
 if TYPE_CHECKING:
     from app.modulos.autenticacion.modelos import Cuenta
+    from app.modulos.compromisos.modelos import Compromiso, CompromisoItem
 
 
 class TipoOrganizacion(enum.Enum):
@@ -48,15 +49,6 @@ class TipoItem(enum.Enum):
     otro = "otro"
 
 
-class NivelGravedad(enum.Enum):
-    """Nivel de gravedad de la emergencia al reservar recursos."""
-
-    baja = "BAJO"
-    media = "MEDIO"
-    alta = "ALTO"
-    critica = "CRITICO"
-
-
 class NivelCertificacion(enum.Enum):
     """Nivel de certificación que habilita una organización para ofrecer recursos."""
 
@@ -64,14 +56,6 @@ class NivelCertificacion(enum.Enum):
     media = "media"
     alta = "alta"
     critica = "crítica"
-
-
-class EstadoCompromiso(enum.Enum):
-    """Estados posibles del compromiso de recursos."""
-
-    comprometido = "COMPROMETIDO"
-    liberado = "LIBERADO"
-    cancelado = "CANCELADO"
 
 
 class EstadoHabilitacion(enum.Enum):
@@ -84,19 +68,6 @@ class EstadoHabilitacion(enum.Enum):
     pendiente = "pendiente"
     habilitada = "habilitada"
     suspendida = "suspendida"
-
-
-class TipoAsignacion(enum.Enum):
-    """
-    Uso de la capacidad validada para la organización en una emergencia.
-    Pendiente: Aún no fue revisada por el Sistema Nacional.
-    Rechazada: Fue rechazada completamente por el Sistema Nacional.
-    """
-
-    pendiente = "pendiente"
-    principal = "principal"
-    apoyo = "apoyo"
-    rechazada = "rechazada"
 
 
 def _valores_enum(tipo_enum: type[enum.Enum]) -> list[str]:
@@ -166,7 +137,10 @@ class Organizacion(db.Model):
         back_populates="organizacion",
         cascade="all, delete-orphan",
     )
-    compromisos: Mapped[list[Compromiso]] = relationship(back_populates="organizacion")
+    compromisos: Mapped[list[Compromiso]] = relationship(
+        "Compromiso",
+        back_populates="organizacion",
+    )
     historial_habilitacion: Mapped[list[HistorialHabilitacion]] = relationship(
         back_populates="organizacion",
         cascade="all, delete-orphan",
@@ -272,6 +246,12 @@ class Item(db.Model):
     __tablename__ = "items"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    codigo_recurso: Mapped[str] = mapped_column(
+        String(200),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
     nombre: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     tipo: Mapped[TipoItem] = mapped_column(
         Enum(
@@ -357,7 +337,10 @@ class InventarioItem(db.Model):
 
     inventario: Mapped[Inventario] = relationship(back_populates="items")
     item: Mapped[Item] = relationship(back_populates="inventario_items")
-    compromisos: Mapped[list[CompromisoItem]] = relationship(back_populates="inventario_item")
+    compromisos: Mapped[list[CompromisoItem]] = relationship(
+        "CompromisoItem",
+        back_populates="inventario_item",
+    )
 
 
 class OrganizacionCertificacion(db.Model):
@@ -408,112 +391,3 @@ class OrganizacionCertificacion(db.Model):
 
     organizacion: Mapped[Organizacion] = relationship(back_populates="certificaciones")
     certificacion: Mapped[Certificacion] = relationship(back_populates="organizaciones")
-
-
-class Compromiso(db.Model):
-    """Reserva de recursos de una organización para una emergencia externa."""
-
-    __tablename__ = "compromisos"
-    __table_args__ = (
-        UniqueConstraint(
-            "id_emergencia_externa",
-            "id_organizacion",
-            name="uq_compromiso_org_emergencia",
-        ),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    organizacion_id: Mapped[int] = mapped_column(
-        "id_organizacion",
-        BigInteger().with_variant(Integer, "sqlite"),
-        ForeignKey("organizaciones.id"),
-        nullable=False,
-    )
-    emergencia_externa_id: Mapped[str] = mapped_column(
-        "id_emergencia_externa",
-        String(255),
-        nullable=False,
-        comment="Identificador opaco de la emergencia en RescueSync o Bonita.",
-    )
-    nivel_gravedad: Mapped[NivelGravedad] = mapped_column(
-        Enum(
-            NivelGravedad,
-            name="nivel_gravedad_enum",
-            native_enum=False,
-            create_constraint=False,
-            length=50,
-            values_callable=_valores_enum,
-        ),
-        nullable=False,
-    )
-    estado: Mapped[EstadoCompromiso] = mapped_column(
-        Enum(
-            EstadoCompromiso,
-            name="estado_compromiso_enum",
-            native_enum=False,
-            create_constraint=False,
-            length=50,
-            values_callable=_valores_enum,
-        ),
-        nullable=False,
-        default=EstadoCompromiso.comprometido,
-        server_default=EstadoCompromiso.comprometido.value,
-    )
-    fecha_compromiso: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-    )
-    fecha_liberacion: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-    )
-
-    organizacion: Mapped[Organizacion] = relationship(back_populates="compromisos")
-    items: Mapped[list[CompromisoItem]] = relationship(
-        back_populates="compromiso",
-        cascade="all, delete-orphan",
-    )
-
-
-class CompromisoItem(db.Model):
-    """Cantidad comprometida de una fila de inventario para una emergencia."""
-
-    __tablename__ = "compromiso_items"
-    __table_args__ = (
-        UniqueConstraint(
-            "id_compromiso",
-            "id_inventario_item",
-            name="uq_compitem_comp_invitem",
-        ),
-        CheckConstraint("cantidad_comprometida > 0", name="cantidad_comprometida_positiva"),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    compromiso_id: Mapped[int] = mapped_column(
-        "id_compromiso",
-        Integer,
-        ForeignKey("compromisos.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    inventario_item_id: Mapped[int] = mapped_column(
-        "id_inventario_item",
-        Integer,
-        ForeignKey("inventario_items.id"),
-        nullable=False,
-    )
-    cantidad_comprometida: Mapped[int] = mapped_column(Integer, nullable=False)
-    tipo_asignacion: Mapped[TipoAsignacion] = mapped_column(
-        Enum(
-            TipoAsignacion,
-            name="tipo_asignacion_enum",
-            native_enum=False,
-            create_constraint=False,
-            length=50,
-            values_callable=_valores_enum,
-        ),
-        nullable=False,
-    )
-
-    compromiso: Mapped[Compromiso] = relationship(back_populates="items")
-    inventario_item: Mapped[InventarioItem] = relationship(back_populates="compromisos")

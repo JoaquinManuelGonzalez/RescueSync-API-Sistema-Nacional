@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from datetime import UTC, datetime
 
 from app.core.semillas import ResultadoSemilla, obtener_o_crear, registrar
@@ -113,6 +115,13 @@ ITEMS: dict[str, tuple[TipoItem, str, str]] = {
     "Generadores eléctricos": (TipoItem.maquinaria, "unidades", "Generadores eléctricos."),
     "Tanques de agua": (TipoItem.maquinaria, "unidades", "Tanques de agua."),
 }
+
+
+def _codigo_recurso(nombre: str) -> str:
+    normalizado = unicodedata.normalize("NFKD", nombre).encode("ascii", "ignore").decode()
+    slug = re.sub(r"[^A-Z0-9]+", "_", normalizado.upper()).strip("_")
+    return f"RSR-{slug}"
+
 
 ITEMS_NO_CONSUMIBLES = frozenset(
     {
@@ -229,6 +238,7 @@ def sembrar_items() -> list[ResultadoSemilla]:
             Item,
             claves={"nombre": nombre},
             valores={
+                "codigo_recurso": _codigo_recurso(nombre),
                 "tipo": tipo,
                 "unidad_medida": unidad,
                 "descripcion": descripcion,

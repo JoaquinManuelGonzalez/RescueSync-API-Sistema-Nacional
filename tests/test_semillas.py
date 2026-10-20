@@ -39,6 +39,12 @@ def test_sembrar_carga_datos_y_es_idempotente(base_de_datos):
     assert sum(resultado.creados for resultado in segunda_carga) == 0
     assert db.session.query(Organizacion).count() == len(semillas.ORGANIZACIONES_DE_DEMOSTRACION)
     assert db.session.query(Item).count() == len(semillas.ITEMS)
+    assert all(item.codigo_recurso for item in db.session.query(Item).all())
+    assert db.session.query(Item.codigo_recurso).distinct().count() == len(semillas.ITEMS)
+    assert (
+        db.session.query(Item).filter_by(nombre="Enfermeros").one().codigo_recurso
+        == "RSR-ENFERMEROS"
+    )
     assert db.session.query(OrganizacionCertificacion).count() == sum(
         len(certificaciones) for certificaciones in semillas.CERTIFICACIONES.values()
     )

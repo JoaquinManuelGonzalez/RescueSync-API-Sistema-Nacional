@@ -6,21 +6,23 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.extensiones import db
-from app.modulos.organizaciones.modelos import (
-    Certificacion,
+from app.modulos.compromisos.modelos import (
     Compromiso,
     CompromisoItem,
     EstadoCompromiso,
+    NivelGravedad,
+    TipoAsignacion,
+)
+from app.modulos.organizaciones.modelos import (
+    Certificacion,
     EstadoHabilitacion,
     HistorialHabilitacion,
     Inventario,
     InventarioItem,
     Item,
     NivelCertificacion,
-    NivelGravedad,
     Organizacion,
     OrganizacionCertificacion,
-    TipoAsignacion,
     TipoItem,
     TipoOrganizacion,
 )
@@ -48,6 +50,7 @@ def crear_organizacion(**valores):
 def test_organizacion_puede_tener_inventario_con_items(base_de_datos):
     organizacion = crear_organizacion()
     item = Item(
+        codigo_recurso="RSR-AGUA_POTABLE",
         nombre="Agua potable",
         tipo=TipoItem.agua,
         unidad_medida="litros",
@@ -120,6 +123,7 @@ def test_compromiso_registra_recursos_de_una_emergencia_externa(base_de_datos):
     organizacion = crear_organizacion()
     inventario_item = InventarioItem(
         item=Item(
+            codigo_recurso="RSR-AGUA_POTABLE",
             nombre="Agua potable",
             tipo=TipoItem.agua,
             unidad_medida="litros",
@@ -152,7 +156,12 @@ def test_compromiso_registra_recursos_de_una_emergencia_externa(base_de_datos):
 
 def test_compromiso_rechaza_cantidad_no_positiva(base_de_datos):
     inventario_item = InventarioItem(
-        item=Item(nombre="Agua potable", tipo=TipoItem.agua, unidad_medida="litros"),
+        item=Item(
+            codigo_recurso="RSR-AGUA_POTABLE",
+            nombre="Agua potable",
+            tipo=TipoItem.agua,
+            unidad_medida="litros",
+        ),
         cantidad_disponible=1000,
     )
     compromiso = Compromiso(
@@ -190,6 +199,7 @@ def test_inventario_rechaza_cantidades_invalidas(
             items=[
                 InventarioItem(
                     item=Item(
+                        codigo_recurso="RSR-AGUA_POTABLE",
                         nombre="Agua potable",
                         tipo=TipoItem.agua,
                         unidad_medida="litros",
