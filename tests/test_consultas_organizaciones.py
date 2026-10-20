@@ -3,20 +3,22 @@ from datetime import UTC, datetime
 import pytest
 
 from app.extensiones import db
-from app.modulos.organizaciones.modelos import (
-    Certificacion,
+from app.modulos.compromisos.modelos import (
     Compromiso,
     CompromisoItem,
     EstadoCompromiso,
+    NivelGravedad,
+    TipoAsignacion,
+)
+from app.modulos.organizaciones.modelos import (
+    Certificacion,
     EstadoHabilitacion,
     Inventario,
     InventarioItem,
     Item,
     NivelCertificacion,
-    NivelGravedad,
     Organizacion,
     OrganizacionCertificacion,
-    TipoAsignacion,
     TipoItem,
     TipoOrganizacion,
 )
@@ -105,7 +107,12 @@ def test_disponibilidad_descuenta_solo_compromisos_activos(base_de_datos, client
         mail_contacto="recursos@example.com",
         identificador_nacional="30-12345678-9",
     )
-    item = Item(nombre="Agua", tipo=TipoItem.agua, unidad_medida="litros")
+    item = Item(
+        codigo_recurso="RSR-AGUA-CONSULTA",
+        nombre="Agua",
+        tipo=TipoItem.agua,
+        unidad_medida="litros",
+    )
     inventario_item = InventarioItem(cantidad_disponible=10, item=item)
     organizacion.inventario = Inventario(items=[inventario_item])
     compromiso_activo = Compromiso(
@@ -170,9 +177,19 @@ def test_disponibilidad_de_una_organizacion_filtra_sus_recursos(base_de_datos, c
         mail_contacto="otra@example.com",
         identificador_nacional="30-98765432-1",
     )
-    item = Item(nombre="Generador", tipo=TipoItem.maquinaria, unidad_medida="unidades")
+    item = Item(
+        codigo_recurso="RSR-GENERADOR-ESP",
+        nombre="Generador",
+        tipo=TipoItem.maquinaria,
+        unidad_medida="unidades",
+    )
     organizacion.inventario = Inventario(items=[InventarioItem(cantidad_disponible=4, item=item)])
-    otro_item = Item(nombre="Agua de otra ONG", tipo=TipoItem.agua, unidad_medida="litros")
+    otro_item = Item(
+        codigo_recurso="RSR-AGUA-OTRA",
+        nombre="Agua de otra ONG",
+        tipo=TipoItem.agua,
+        unidad_medida="litros",
+    )
     otro_organizacion.inventario = Inventario(
         items=[InventarioItem(cantidad_disponible=20, item=otro_item)]
     )

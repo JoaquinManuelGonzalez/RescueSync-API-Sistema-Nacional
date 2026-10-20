@@ -210,7 +210,12 @@ def test_bonita_no_puede_cambiar_el_estado(cliente, cabeceras, organizacion):
 
 
 def test_administrador_carga_item_y_cantidad_al_inventario(cliente, cabeceras, organizacion):
-    item = Item(nombre="Agua potable", tipo=TipoItem.agua, unidad_medida="litros")
+    item = Item(
+        codigo_recurso="RSR-AGUA-PADRON",
+        nombre="Agua potable",
+        tipo=TipoItem.agua,
+        unidad_medida="litros",
+    )
     db.session.add(item)
     db.session.commit()
 

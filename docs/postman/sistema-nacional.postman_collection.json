@@ -1524,6 +1524,288 @@
           ]
         }
       ]
+    },
+    {
+      "name": "6. Compromiso/Liberacion",
+      "description": "Endpoints de control de concurrencia, bloqueo transaccional y cierre bilateral de proyectos.",
+      "item": [
+        {
+          "name": "Compromiso",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "postman-corr-compromiso"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recursos/compromisos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recursos",
+                "compromisos"
+              ]
+            },
+            "description": "Compromete de forma transaccional los recursos adjudicados para una emergencia con bloqueo concurrente (locking).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenBonita}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emergencia_externa_id\": \"emergencia-postman-01\",\n  \"nivel_gravedad\": \"MEDIA\",\n  \"aportes\": [\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-AGUA_POTABLE_ENVASADA\",\n      \"cantidad\": 100,\n      \"tipo_asignacion\": \"principal\"\n    },\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n      \"cantidad\": 2,\n      \"tipo_asignacion\": \"principal\"\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Compromiso registrado exitosamente\", () => {",
+                  "  pm.expect([200, 201]).to.include(pm.response.code);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.emergencia_externa_id).to.eql(\"emergencia-postman-01\");",
+                  "  pm.expect(json.compromisos.length).to.be.above(0);",
+                  "  pm.expect(json.compromisos[0].estado).to.eql(\"COMPROMETIDO\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reintento de compromiso (Idempotencia)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "postman-corr-reintento"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recursos/compromisos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recursos",
+                "compromisos"
+              ]
+            },
+            "description": "Comprueba que un reintento idéntico de Bonita es idempotente (200 OK y repetido=true sin volver a descontar inventario).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenBonita}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emergencia_externa_id\": \"emergencia-postman-01\",\n  \"nivel_gravedad\": \"MEDIA\",\n  \"aportes\": [\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-AGUA_POTABLE_ENVASADA\",\n      \"cantidad\": 100,\n      \"tipo_asignacion\": \"principal\"\n    },\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n      \"cantidad\": 2,\n      \"tipo_asignacion\": \"principal\"\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Reintento responde 200 con repetido=true\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().repetido).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Liberacion",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "postman-corr-liberacion"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recursos/compromisos/emergencia-postman-01/ongs/30-65432198-7/finalizacion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recursos",
+                "compromisos",
+                "emergencia-postman-01",
+                "ongs",
+                "30-65432198-7",
+                "finalizacion"
+              ]
+            },
+            "description": "Reporta la finalización de actividades de una ONG. Cierra el proyecto cuando todas terminan y devuelve al inventario solo bienes no consumibles.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenBonita}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Finalización y cierre exitoso con 200\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.emergencia_externa_id).to.eql(\"emergencia-postman-01\");",
+                  "  pm.expect(json.identificador_nacional).to.eql(\"30-65432198-7\");",
+                  "  pm.expect(json.proyecto_cerrado).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Concurrencia",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "postman-corr-concurrencia"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recursos/compromisos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recursos",
+                "compromisos"
+              ]
+            },
+            "description": "Dispara dos pedidos en paralelo compitiendo por un mismo recurso (700 litros de agua cada uno cuando quedan menos de 1000). Valida que el locking transaccional evita sobreasignación: uno gana (201) y el otro es rechazado (422).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenBonita}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emergencia_externa_id\": \"emergencia-concurrente-A\",\n  \"nivel_gravedad\": \"MEDIA\",\n  \"aportes\": [\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-AGUA_POTABLE_ENVASADA\",\n      \"cantidad\": 700,\n      \"tipo_asignacion\": \"principal\"\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const baseUrl = pm.environment.get(\"baseUrl\") || \"http://localhost:8000\";",
+                  "const token = pm.collectionVariables.get(\"tokenBonita\");",
+                  "",
+                  "const pedido1 = {",
+                  "  url: baseUrl + \"/recursos/compromisos\",",
+                  "  method: \"POST\",",
+                  "  header: {",
+                  "    \"Content-Type\": \"application/json\",",
+                  "    \"Authorization\": \"Bearer \" + token,",
+                  "    \"X-Correlation-Id\": \"concurrencia-A\"",
+                  "  },",
+                  "  body: {",
+                  "    mode: \"raw\",",
+                  "    raw: JSON.stringify({",
+                  "      emergencia_externa_id: \"emergencia-concurrente-A\",",
+                  "      nivel_gravedad: \"MEDIA\",",
+                  "      aportes: [{",
+                  "        identificador_nacional: \"30-65432198-7\",",
+                  "        codigo_recurso: \"RSR-AGUA_POTABLE_ENVASADA\",",
+                  "        cantidad: 700,",
+                  "        tipo_asignacion: \"principal\"",
+                  "      }]",
+                  "    })",
+                  "  }",
+                  "};",
+                  "",
+                  "const pedido2 = {",
+                  "  url: baseUrl + \"/recursos/compromisos\",",
+                  "  method: \"POST\",",
+                  "  header: {",
+                  "    \"Content-Type\": \"application/json\",",
+                  "    \"Authorization\": \"Bearer \" + token,",
+                  "    \"X-Correlation-Id\": \"concurrencia-B\"",
+                  "  },",
+                  "  body: {",
+                  "    mode: \"raw\",",
+                  "    raw: JSON.stringify({",
+                  "      emergencia_externa_id: \"emergencia-concurrente-B\",",
+                  "      nivel_gravedad: \"MEDIA\",",
+                  "      aportes: [{",
+                  "        identificador_nacional: \"30-65432198-7\",",
+                  "        codigo_recurso: \"RSR-AGUA_POTABLE_ENVASADA\",",
+                  "        cantidad: 700,",
+                  "        tipo_asignacion: \"principal\"",
+                  "      }]",
+                  "    })",
+                  "  }",
+                  "};",
+                  "",
+                  "Promise.all([",
+                  "  new Promise(resolve => pm.sendRequest(pedido1, (err, res) => resolve(res.code))),",
+                  "  new Promise(resolve => pm.sendRequest(pedido2, (err, res) => resolve(res.code)))",
+                  "]).then(codigos => {",
+                  "  pm.test(\"Control de concurrencia: exactamente un pedido gana (201) y el otro es rechazado (422)\", () => {",
+                  "    pm.expect(codigos).to.include(201);",
+                  "    pm.expect(codigos).to.include(422);",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "variable": [
