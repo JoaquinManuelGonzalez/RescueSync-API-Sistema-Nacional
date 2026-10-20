@@ -57,6 +57,15 @@ class NivelGravedad(enum.Enum):
     critica = "CRITICO"
 
 
+class NivelCertificacion(enum.Enum):
+    """Nivel de certificación que habilita una organización para ofrecer recursos."""
+
+    baja = "baja"
+    media = "media"
+    alta = "alta"
+    critica = "crítica"
+
+
 class EstadoCompromiso(enum.Enum):
     """Estados posibles del compromiso de recursos."""
 
@@ -361,6 +370,10 @@ class OrganizacionCertificacion(db.Model):
             "id_certificacion",
             name="uq_orgcert_org_cert",
         ),
+        CheckConstraint(
+            "nivel_riesgo_permitido IN ('baja', 'media', 'alta', 'crítica')",
+            name="nivel_riesgo_permitido_valido",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -376,7 +389,17 @@ class OrganizacionCertificacion(db.Model):
         ForeignKey("certificaciones.id", ondelete="CASCADE"),
         nullable=False,
     )
-    nivel_riesgo_permitido: Mapped[str] = mapped_column(String(50), nullable=False)
+    nivel_riesgo_permitido: Mapped[NivelCertificacion] = mapped_column(
+        Enum(
+            NivelCertificacion,
+            name="nivel_certificacion_enum",
+            native_enum=False,
+            create_constraint=False,
+            length=50,
+            values_callable=_valores_enum,
+        ),
+        nullable=False,
+    )
     fecha_emision: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     fecha_vencimiento: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),

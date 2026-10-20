@@ -12,6 +12,7 @@ from flask import Flask
 from app.core.openapi import Api
 from app.modulos.autenticacion.comandos import grupo_cuentas
 from app.modulos.autenticacion.rutas import blueprint_autenticacion
+from app.modulos.organizaciones.rutas import blueprint_organizaciones
 from app.modulos.organizaciones.rutas_padron import blueprint_padron
 
 
@@ -29,6 +30,7 @@ def registrar_modulos(app: Flask, api: Api) -> None:  # noqa: ARG001
 
     api.register_blueprint(blueprint_autenticacion)
     api.register_blueprint(blueprint_padron)
+    api.register_blueprint(blueprint_organizaciones)
 
 
 def registrar_comandos(app: Flask) -> None:

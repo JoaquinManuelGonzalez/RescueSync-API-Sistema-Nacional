@@ -8,9 +8,12 @@ from app.core.acceso import Rol
 from app.extensiones import db
 from app.modulos.organizaciones import servicios
 from app.modulos.organizaciones.modelos import (
+    Certificacion,
     EstadoHabilitacion,
     HistorialHabilitacion,
+    Item,
     Organizacion,
+    TipoItem,
     TipoOrganizacion,
 )
 
@@ -200,6 +203,59 @@ def test_bonita_no_puede_cambiar_el_estado(cliente, cabeceras, organizacion):
     respuesta = cliente.patch(
         "/ongs/30-65432198-7/habilitacion",
         json={"estado": "suspendida", "motivo": "x"},
+        headers=cabeceras(Rol.sistema),
+    )
+
+    assert respuesta.status_code == 403
+
+
+def test_administrador_carga_item_y_cantidad_al_inventario(cliente, cabeceras, organizacion):
+    item = Item(nombre="Agua potable", tipo=TipoItem.agua, unidad_medida="litros")
+    db.session.add(item)
+    db.session.commit()
+
+    respuesta = cliente.post(
+        "/ongs/30-65432198-7/inventario",
+        json={"item_id": item.id, "cantidad_disponible": 750},
+        headers=cabeceras(Rol.administrador),
+    )
+
+    assert respuesta.status_code == 201
+    assert respuesta.get_json()["item_nombre"] == "Agua potable"
+    assert respuesta.get_json()["cantidad_disponible"] == 750
+
+
+def test_administrador_carga_certificacion_y_nivel(cliente, cabeceras, organizacion):
+    certificacion = Certificacion(nombre="ISO 9001", tipo=TipoItem.otro)
+    db.session.add(certificacion)
+    db.session.commit()
+
+    respuesta = cliente.post(
+        "/ongs/30-65432198-7/certificaciones",
+        json={"certificacion_id": certificacion.id, "nivel_certificacion": "alta"},
+        headers=cabeceras(Rol.administrador),
+    )
+
+    assert respuesta.status_code == 201
+    cuerpo = respuesta.get_json()
+    assert cuerpo["certificacion_nombre"] == "ISO 9001"
+    assert cuerpo["nivel_certificacion"] == "alta"
+
+
+def test_carga_certificacion_rechaza_nivel_invalido(cliente, cabeceras, organizacion):
+    respuesta = cliente.post(
+        "/ongs/30-65432198-7/certificaciones",
+        json={"certificacion_id": 1, "nivel_certificacion": "ALTO"},
+        headers=cabeceras(),
+    )
+
+    assert respuesta.status_code == 400
+
+
+def test_bonita_no_puede_cargar_inventario(cliente, cabeceras, organizacion):
+    respuesta = cliente.post(
+        "/ongs/30-65432198-7/inventario",
+        json={"item_id": 1, "cantidad_disponible": 1},
         headers=cabeceras(Rol.sistema),
     )
 
