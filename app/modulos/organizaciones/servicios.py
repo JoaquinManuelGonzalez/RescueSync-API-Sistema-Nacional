@@ -8,6 +8,7 @@ identifican a una organización por su CUIT (`identificador_nacional`), no por s
 from __future__ import annotations
 
 import re
+from datetime import UTC, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -16,9 +17,15 @@ from app.core.acceso import Actor
 from app.core.errores import ConflictoDeEstado, RecursoNoEncontrado, SolicitudInvalida
 from app.extensiones import db
 from app.modulos.organizaciones.modelos import (
+    Certificacion,
     EstadoHabilitacion,
     HistorialHabilitacion,
+    Inventario,
+    InventarioItem,
+    Item,
+    NivelCertificacion,
     Organizacion,
+    OrganizacionCertificacion,
     TipoOrganizacion,
 )
 
@@ -154,6 +161,60 @@ def cambiar_estado_habilitacion(
     organizacion.historial_habilitacion.append(_nuevo_registro(actual, estado_nuevo, motivo, actor))
     db.session.commit()
     return organizacion
+
+
+def cargar_item(cuit: str, item_id: int, cantidad_disponible: int) -> InventarioItem:
+    """Agrega un ítem al inventario de una organización."""
+    organizacion = obtener_por_cuit(cuit)
+    item = db.session.get(Item, item_id)
+    if item is None:
+        raise RecursoNoEncontrado(
+            "No hay ningún ítem con ese identificador.",
+            detalle={"item_id": item_id},
+        )
+    if organizacion.inventario is None:
+        organizacion.inventario = Inventario()
+    if any(registro.item_id == item_id for registro in organizacion.inventario.items):
+        raise ConflictoDeEstado(
+            "La organización ya tiene cargado ese ítem.",
+            detalle={"item_id": item_id, "cuit": organizacion.identificador_nacional},
+        )
+    registro = InventarioItem(item=item, cantidad_disponible=cantidad_disponible)
+    organizacion.inventario.items.append(registro)
+    db.session.commit()
+    return registro
+
+
+def cargar_certificacion(
+    cuit: str, certificacion_id: int, nivel_certificacion: NivelCertificacion
+) -> OrganizacionCertificacion:
+    """Asigna una certificación a una organización con su nivel."""
+    organizacion = obtener_por_cuit(cuit)
+    certificacion = db.session.get(Certificacion, certificacion_id)
+    if certificacion is None:
+        raise RecursoNoEncontrado(
+            "No hay ninguna certificación con ese identificador.",
+            detalle={"certificacion_id": certificacion_id},
+        )
+    if any(
+        asignacion.certificacion_id == certificacion_id
+        for asignacion in organizacion.certificaciones
+    ):
+        raise ConflictoDeEstado(
+            "La organización ya tiene cargada esa certificación.",
+            detalle={
+                "certificacion_id": certificacion_id,
+                "cuit": organizacion.identificador_nacional,
+            },
+        )
+    asignacion = OrganizacionCertificacion(
+        certificacion=certificacion,
+        nivel_riesgo_permitido=nivel_certificacion,
+        fecha_emision=datetime.now(UTC),
+    )
+    organizacion.certificaciones.append(asignacion)
+    db.session.commit()
+    return asignacion
 
 
 def _rechazar_duplicado(cuit: str, nombre: str, mail: str) -> None:

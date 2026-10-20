@@ -75,6 +75,59 @@ def test_tipos_de_certificacion_son_categorias_de_items(base_de_datos):
     assert db.session.query(InventarioItem).count() > 0
 
 
+def test_semillas_tienen_una_certificacion_por_tipo(base_de_datos):
+    from app.core.semillas import SEEDERS, importar_seeders
+
+    importar_seeders()
+    for seeder in SEEDERS:
+        seeder.funcion()
+    db.session.commit()
+
+    certificaciones = db.session.query(Certificacion).all()
+    tipos = [certificacion.tipo for certificacion in certificaciones]
+
+    assert len(tipos) == len(set(tipos))
+    assert set(tipos) == set(TipoItem)
+
+
+def test_semillas_clasifican_recursos_consumibles_y_reutilizables(base_de_datos):
+    from app.core.semillas import SEEDERS, importar_seeders
+
+    importar_seeders()
+    for seeder in SEEDERS:
+        seeder.funcion()
+    db.session.commit()
+
+    items = {item.nombre: item.consumible for item in db.session.query(Item).all()}
+
+    assert items["Paramédicos"] is False
+    assert items["Enfermeros"] is False
+    assert items["Rescatistas"] is False
+    assert items["Ambulancias"] is False
+    assert items["Generadores eléctricos"] is False
+    assert items["Frazadas"] is True
+    assert items["Colchones"] is True
+    assert items["Tanques de agua"] is True
+    assert items["Agua potable envasada"] is True
+    assert items["Antibióticos"] is True
+    assert items["Raciones de alimento no perecedero"] is True
+
+
+def test_semillas_corrigen_consumible_al_reejecutarse(base_de_datos):
+    from app.core.semillas import SEEDERS, importar_seeders
+
+    importar_seeders()
+    for seeder in SEEDERS:
+        seeder.funcion()
+    db.session.query(Item).filter_by(nombre="Paramédicos").one().consumible = True
+    db.session.commit()
+
+    semillas.sembrar_items()
+    db.session.commit()
+
+    assert db.session.query(Item).filter_by(nombre="Paramédicos").one().consumible is False
+
+
 def test_comando_flask_seed_carga_los_datos(app):
     with app.app_context():
         db.create_all()

@@ -14,6 +14,7 @@ from app.modulos.organizaciones.modelos import (
     Inventario,
     InventarioItem,
     Item,
+    NivelCertificacion,
     Organizacion,
     OrganizacionCertificacion,
     TipoItem,
@@ -63,12 +64,12 @@ CERTIFICACIONES: dict[str, tuple[tuple[str, TipoItem], ...]] = {
         ("Certificación de logística de maquinaria", TipoItem.maquinaria),
     ),
     "Bomberos Voluntarios de La Plata": (
-        ("Certificación de operaciones de rescate", TipoItem.rescate),
-        ("Certificación de maquinaria pesada", TipoItem.maquinaria),
+        ("Certificación de respuesta ante emergencias", TipoItem.rescate),
+        ("Certificación de logística de maquinaria", TipoItem.maquinaria),
         ("Certificación de atención sanitaria", TipoItem.personal_medico),
     ),
     "Grupo Scouts de Pergamino": (
-        ("Certificación de apoyo alimentario", TipoItem.alimentos),
+        ("Certificación de distribución de alimentos", TipoItem.alimentos),
         ("Certificación de apoyo logístico", TipoItem.otro),
     ),
 }
@@ -121,6 +122,21 @@ def _codigo_recurso(nombre: str) -> str:
     slug = re.sub(r"[^A-Z0-9]+", "_", normalizado.upper()).strip("_")
     return f"RSR-{slug}"
 
+
+ITEMS_NO_CONSUMIBLES = frozenset(
+    {
+        "Paramédicos",
+        "Enfermeros",
+        "Rescatistas",
+        "Voluntarios generales",
+        "Perros de búsqueda",
+        "Carpas familiares",
+        "Ambulancias",
+        "Camiones de carga",
+        "Retroexcavadoras",
+        "Generadores eléctricos",
+    }
+)
 
 INVENTARIOS: dict[str, tuple[str, str, dict[str, int]]] = {
     "Cruz Solidaria": (
@@ -218,7 +234,7 @@ def sembrar_organizaciones() -> list[ResultadoSemilla]:
 def sembrar_items() -> list[ResultadoSemilla]:
     resultado = ResultadoSemilla("items")
     for nombre, (tipo, unidad, descripcion) in ITEMS.items():
-        _, creado = obtener_o_crear(
+        item, creado = obtener_o_crear(
             Item,
             claves={"nombre": nombre},
             valores={
@@ -226,8 +242,10 @@ def sembrar_items() -> list[ResultadoSemilla]:
                 "tipo": tipo,
                 "unidad_medida": unidad,
                 "descripcion": descripcion,
+                "consumible": nombre not in ITEMS_NO_CONSUMIBLES,
             },
         )
+        item.consumible = nombre not in ITEMS_NO_CONSUMIBLES
         resultado.contar(creado)
     return [resultado]
 
@@ -249,7 +267,7 @@ def sembrar_certificaciones() -> list[ResultadoSemilla]:
                     "certificacion_id": certificacion.id,
                 },
                 valores={
-                    "nivel_riesgo_permitido": "ALTO",
+                    "nivel_riesgo_permitido": NivelCertificacion.alta,
                     "fecha_emision": datetime.now(UTC),
                 },
             )

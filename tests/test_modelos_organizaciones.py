@@ -20,6 +20,7 @@ from app.modulos.organizaciones.modelos import (
     Inventario,
     InventarioItem,
     Item,
+    NivelCertificacion,
     Organizacion,
     OrganizacionCertificacion,
     TipoItem,
@@ -79,7 +80,7 @@ def test_organizacion_puede_tener_multiples_certificaciones(base_de_datos):
         certificaciones=[
             OrganizacionCertificacion(
                 certificacion=certificacion,
-                nivel_riesgo_permitido="ALTO",
+                nivel_riesgo_permitido=NivelCertificacion.alta,
                 fecha_emision=datetime.now(UTC),
             )
             for certificacion in certificaciones
@@ -103,7 +104,7 @@ def test_al_eliminar_una_organizacion_se_eliminan_sus_certificaciones(base_de_da
         certificaciones=[
             OrganizacionCertificacion(
                 certificacion=certificacion,
-                nivel_riesgo_permitido="ALTO",
+                nivel_riesgo_permitido=NivelCertificacion.alta,
                 fecha_emision=datetime.now(UTC),
             )
         ]
