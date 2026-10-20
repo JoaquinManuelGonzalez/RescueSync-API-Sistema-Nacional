@@ -154,6 +154,7 @@ app/                    código de la API
   modulos/              módulos de dominio:
     autenticacion/      /login, /cuentas/yo, tabla cuentas y comandos `flask cuentas`
     organizaciones/     padrón de ONGs (/ongs), estados de habilitación e inventarios
+    evaluacion/         evaluación de ofertas por competencia (/ofertas/evaluacion)
     compromisos/        bloqueo y liberación de recursos
 migrations/             migraciones de Alembic (0001: línea base;
                         f5b04d297d15: organizaciones e inventarios;
@@ -530,6 +531,8 @@ proceso:
 - Los endpoints de negocio que va a consumir Bonita (evaluación, reserva y compromiso de
   recursos) llegan en las épicas siguientes. El padrón (`GET /ongs/{cuit}`) ya está disponible.
 - La lógica de dominio para comprometer y liberar recursos está en `app/modulos/compromisos`;
+  [`POST /ofertas/evaluacion`](docs/contratos/evaluacion-ofertas.md) evalúa las ofertas por ítem
+  y registra los compromisos de recursos no consumibles aceptados. Luego,
   [`POST /recursos/compromisos`](docs/contratos/compromisos.md) permite comprometer los recursos
   seleccionados por el proceso. El endpoint de finalización registra el cierre de cada ONG y
   libera el proyecto cuando todas terminan.

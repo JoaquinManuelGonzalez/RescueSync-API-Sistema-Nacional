@@ -1806,6 +1806,244 @@
           ]
         }
       ]
+    },
+    {
+      "name": "7. Evaluación de ofertas",
+      "description": "Evaluación por aporte del payload consolidado recibido desde Bonita. El cruce usa identificador_nacional; organizacion_id es informativo.",
+      "item": [
+        {
+          "name": "Caso principal o apoyo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ofertas/evaluacion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ofertas",
+                "evaluacion"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenBonita}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emergencia_id\": 14,\n  \"nivel_gravedad\": \"ALTA\",\n  \"ofertas\": [\n    {\n      \"fecha_creacion\": \"2026-10-16T14:40:44Z\",\n      \"items\": [\n        {\n          \"aportes\": [\n            {\n              \"cantidad\": 2,\n              \"identificador_nacional\": \"30-65432198-7\",\n              \"organizacion_id\": 6\n            }\n          ],\n          \"cantidad_total\": 2,\n          \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n          \"lote_item_id\": 10,\n          \"tipo_recurso\": \"personal_medico\",\n          \"unidad\": \"personas\"\n        },\n        {\n          \"aportes\": [\n            {\n              \"cantidad\": 2,\n              \"identificador_nacional\": \"30-65432199-5\",\n              \"organizacion_id\": 7\n            }\n          ],\n          \"cantidad_total\": 2,\n          \"codigo_recurso\": \"RSR-FRAZADAS\",\n          \"lote_item_id\": 11,\n          \"tipo_recurso\": \"abrigo\",\n          \"unidad\": \"unidades\"\n        }\n      ],\n      \"oferta_id\": 7,\n      \"organizaciones\": [\n        {\n          \"id\": 6,\n          \"identificador_nacional\": \"30-65432198-7\",\n          \"nombre\": \"Cruz Solidaria\",\n          \"rol\": \"aportante\"\n        },\n        {\n          \"id\": 7,\n          \"identificador_nacional\": \"30-65432199-5\",\n          \"nombre\": \"Manos Unidas\",\n          \"rol\": \"aportante\"\n        }\n      ],\n      \"version\": 2\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Evalúa la oferta\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const aporte = pm.response.json().ofertas[0].items[0].aportes[0];",
+                  "  pm.expect(aporte.clasificacion).to.eql(\"principal\");",
+                  "  const apoyo = pm.response.json().ofertas[0].items[1].aportes[0];",
+                  "  pm.expect(apoyo.clasificacion).to.eql(\"apoyo\");",
+                  "  pm.expect(aporte.motivo).to.be.a(\"string\").and.not.empty;",
+                  "  pm.expect(apoyo.motivo).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Caso organización no registrada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ofertas/evaluacion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ofertas",
+                "evaluacion"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenBonita}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emergencia_id\": 15,\n  \"nivel_gravedad\": \"ALTA\",\n  \"ofertas\": [\n    {\n      \"fecha_creacion\": \"2026-10-20T12:00:00Z\",\n      \"items\": [\n        {\n          \"aportes\": [\n            {\n              \"cantidad\": 1,\n              \"identificador_nacional\": \"30-00000000-0\",\n              \"organizacion_id\": 999\n            }\n          ],\n          \"cantidad_total\": 1,\n          \"codigo_recurso\": \"RSR-ENFERMEROS\",\n          \"lote_item_id\": 11,\n          \"tipo_recurso\": \"personal_medico\",\n          \"unidad\": \"personas\"\n        }\n      ],\n      \"oferta_id\": 8,\n      \"organizaciones\": [\n        {\n          \"id\": 6,\n          \"identificador_nacional\": \"30-65432198-7\",\n          \"nombre\": \"Cruz Solidaria\",\n          \"rol\": \"aportante\"\n        }\n      ],\n      \"version\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Rechaza la organización no registrada\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const aporte = pm.response.json().ofertas[0].items[0].aportes[0];",
+                  "  pm.expect(aporte.clasificacion).to.eql(\"rechazada\");",
+                  "  pm.expect(aporte.motivo).to.include(\"no está registrada\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Caso rechazo por cantidad insuficiente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ofertas/evaluacion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ofertas",
+                "evaluacion"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenBonita}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emergencia_id\": 16,\n  \"nivel_gravedad\": \"ALTA\",\n  \"ofertas\": [\n    {\n      \"fecha_creacion\": \"2026-10-20T17:00:00Z\",\n      \"items\": [\n        {\n          \"aportes\": [\n            {\n              \"cantidad\": 11,\n              \"identificador_nacional\": \"30-65432198-7\",\n              \"organizacion_id\": 6\n            }\n          ],\n          \"cantidad_total\": 11,\n          \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n          \"lote_item_id\": 12,\n          \"tipo_recurso\": \"personal_medico\",\n          \"unidad\": \"personas\"\n        }\n      ],\n      \"oferta_id\": 9,\n      \"organizaciones\": [\n        {\n          \"id\": 6,\n          \"identificador_nacional\": \"30-65432198-7\",\n          \"nombre\": \"Cruz Solidaria\",\n          \"rol\": \"aportante\"\n        }\n      ],\n      \"version\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Rechaza por cantidad insuficiente\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const aporte = pm.response.json().ofertas[0].items[0].aportes[0];",
+                  "  pm.expect(aporte.clasificacion).to.eql(\"rechazada\");",
+                  "  pm.expect(aporte.motivo).to.include(\"no alcanza la cantidad ofertada\");",
+                  "  pm.expect(aporte.motivo).to.include(\"disponible\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Caso rechazo por falta de certificaci?n",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ofertas/evaluacion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ofertas",
+                "evaluacion"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenBonita}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emergencia_id\": 17,\n  \"nivel_gravedad\": \"ALTA\",\n  \"ofertas\": [\n    {\n      \"fecha_creacion\": \"2026-10-20T17:00:00Z\",\n      \"items\": [\n        {\n          \"aportes\": [\n            {\n              \"cantidad\": 1,\n              \"identificador_nacional\": \"30-65432198-7\",\n              \"organizacion_id\": 6\n            }\n          ],\n          \"cantidad_total\": 1,\n          \"codigo_recurso\": \"RSR-FRAZADAS\",\n          \"lote_item_id\": 13,\n          \"tipo_recurso\": \"abrigo\",\n          \"unidad\": \"unidades\"\n        }\n      ],\n      \"oferta_id\": 10,\n      \"organizaciones\": [\n        {\n          \"id\": 6,\n          \"identificador_nacional\": \"30-65432198-7\",\n          \"nombre\": \"Cruz Solidaria\",\n          \"rol\": \"aportante\"\n        }\n      ],\n      \"version\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Rechaza por falta de certificaci?n\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const aporte = pm.response.json().ofertas[0].items[0].aportes[0];",
+                  "  pm.expect(aporte.clasificacion).to.eql(\"rechazada\");",
+                  "  pm.expect(aporte.motivo).to.include(\"No existe certificaci?n\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "variable": [

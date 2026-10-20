@@ -51,3 +51,12 @@ def test_errores_de_validacion_se_documentan_como_400(especificacion):
 
 def test_swagger_ui_conserva_el_token_al_recargar(app):
     assert app.config["OPENAPI_SWAGGER_UI_CONFIG"] == {"persistAuthorization": True}
+
+
+def test_documenta_evaluacion_de_ofertas(especificacion):
+    operacion = especificacion["paths"]["/ofertas/evaluacion"]["post"]
+
+    assert "application/json" in operacion["requestBody"]["content"]
+    assert "200" in operacion["responses"]
+    assert "401" in operacion["responses"]
+    assert "403" in operacion["responses"]

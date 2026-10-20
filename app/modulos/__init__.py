@@ -13,6 +13,7 @@ from app.core.openapi import Api
 from app.modulos.autenticacion.comandos import grupo_cuentas
 from app.modulos.autenticacion.rutas import blueprint_autenticacion
 from app.modulos.compromisos.rutas import blueprint_compromisos
+from app.modulos.evaluacion.rutas import blueprint_evaluacion as blueprint_evaluacion
 from app.modulos.organizaciones.rutas import blueprint_organizaciones
 from app.modulos.organizaciones.rutas_padron import blueprint_padron
 
@@ -33,6 +34,7 @@ def registrar_modulos(app: Flask, api: Api) -> None:  # noqa: ARG001
     api.register_blueprint(blueprint_padron)
     api.register_blueprint(blueprint_organizaciones)
     api.register_blueprint(blueprint_compromisos)
+    api.register_blueprint(blueprint_evaluacion)
 
 
 def registrar_comandos(app: Flask) -> None:
@@ -46,7 +48,7 @@ def importar_modelos() -> None:
     Alembic solo detecta en `flask db migrate` los modelos que fueron importados: un modelo que
     nadie importa genera una migracion vacia sin avisar. Cada modulo nuevo con `modelos.py`
     agrega aca su import, por ejemplo:
-
+        import app.modulos.compromisos.modelos  # noqa: F401
         import app.modulos.compromisos.modelos  # noqa: F401
     """
     import app.modulos.autenticacion.modelos  # noqa: F401
