@@ -84,3 +84,16 @@ class RespuestaFinalizacion(Schema):
     organizaciones_finalizadas = fields.Integer(required=True)
     organizaciones_participantes = fields.Integer(required=True)
     repetido = fields.Boolean(required=True)
+
+
+class MotivoFalloRespuesta(Schema):
+    identificador_nacional = fields.String(required=True)
+    codigo_recurso = fields.String(required=True)
+    cantidad_solicitada = fields.Integer(required=True)
+    cantidad_disponible = fields.Integer(required=True)
+    motivo = fields.String(required=True)
+
+
+class RespuestaValidacion(Schema):
+    valido = fields.Boolean(required=True)
+    motivos = fields.List(fields.Nested(MotivoFalloRespuesta), required=True)

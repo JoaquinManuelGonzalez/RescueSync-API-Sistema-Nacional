@@ -1588,6 +1588,167 @@
           ]
         },
         {
+          "name": "Validar restricciones (dry-run) - OK",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('valido es true', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.valido).to.be.true;",
+                  "    pm.expect(b.motivos).to.be.an('array').that.is.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenSistema}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emergencia_externa_id\": \"emergencia-postman-01\",\n  \"nivel_gravedad\": \"ALTA\",\n  \"aportes\": [\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n      \"cantidad\": 3,\n      \"tipo_asignacion\": \"principal\"\n    },\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-AGUA_POTABLE_ENVASADA\",\n      \"cantidad\": 99999,\n      \"tipo_asignacion\": \"apoyo\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/recursos/compromisos/validar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recursos",
+                "compromisos",
+                "validar"
+              ]
+            },
+            "description": "Dry-run: valida disponibilidad sin modificar inventario.\n\n- RSR-PARAMEDICOS (no consumible): stock=10, pide 3 → pasa.\n- RSR-AGUA_POTABLE_ENVASADA (consumible): cantidad irrelevante → pasa siempre.\n\nResultado esperado: valido=true, motivos=[]."
+          }
+        },
+        {
+          "name": "Validar restricciones (dry-run) - Stock insuficiente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('valido es false con motivo', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.valido).to.be.false;",
+                  "    pm.expect(b.motivos).to.have.lengthOf(1);",
+                  "    pm.expect(b.motivos[0].motivo).to.equal('stock_insuficiente');",
+                  "    pm.expect(b.motivos[0].codigo_recurso).to.equal('RSR-PARAMEDICOS');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenSistema}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emergencia_externa_id\": \"emergencia-postman-02\",\n  \"nivel_gravedad\": \"MEDIA\",\n  \"aportes\": [\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n      \"cantidad\": 999,\n      \"tipo_asignacion\": \"principal\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/recursos/compromisos/validar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recursos",
+                "compromisos",
+                "validar"
+              ]
+            },
+            "description": "Dry-run que falla: RSR-PARAMEDICOS es no consumible, stock=10, se piden 999.\n\nResultado esperado: valido=false, motivos con stock_insuficiente para RSR-PARAMEDICOS.\nEl inventario NO se modifica."
+          }
+        },
+        {
+          "name": "Validar restricciones (dry-run) - Consumible cantidad extrema (siempre OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('consumible ignora stock', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.valido).to.be.true;",
+                  "    pm.expect(b.motivos).to.be.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenSistema}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emergencia_externa_id\": \"emergencia-postman-03\",\n  \"nivel_gravedad\": \"CRITICA\",\n  \"aportes\": [\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-AGUA_POTABLE_ENVASADA\",\n      \"cantidad\": 9999999,\n      \"tipo_asignacion\": \"apoyo\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/recursos/compromisos/validar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recursos",
+                "compromisos",
+                "validar"
+              ]
+            },
+            "description": "RSR-AGUA_POTABLE_ENVASADA es consumible: sin importar la cantidad pedida, la validación pasa. Esto confirma que la API no gestiona inventario dinámico para consumibles."
+          }
+        },
+        {
           "name": "Reintento de compromiso (Idempotencia)",
           "request": {
             "method": "POST",
@@ -1805,7 +1966,17 @@
             }
           ]
         }
-      ]
+      ],
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{tokenBonita}}",
+            "type": "string"
+          }
+        ]
+      }
     }
   ],
   "variable": [

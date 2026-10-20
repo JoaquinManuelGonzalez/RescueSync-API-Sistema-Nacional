@@ -40,6 +40,21 @@ class ResultadoCompromiso:
 
 
 @dataclass(frozen=True)
+class MotivoFallo:
+    identificador_nacional: str
+    codigo_recurso: str
+    cantidad_solicitada: int
+    cantidad_disponible: int
+    motivo: str
+
+
+@dataclass(frozen=True)
+class ResultadoValidacion:
+    valido: bool
+    motivos: tuple[MotivoFallo, ...]
+
+
+@dataclass(frozen=True)
 class ResultadoLiberacion:
     compromisos: tuple[Compromiso, ...]
     repetido: bool
@@ -206,6 +221,94 @@ def _validar_repeticion(
     return True
 
 
+def validar_restricciones(
+    *,
+    emergencia_externa_id: str,
+    nivel_gravedad: NivelGravedad | str,
+    aportes: list[AporteSolicitado],
+) -> ResultadoValidacion:
+    """Valida si los aportes son comprometibles sin modificar el inventario (dry-run).
+
+    Solo verifica disponibilidad en ítems no consumibles. Los consumibles se aprueban
+    directamente sin verificación de stock, ya que la API no gestiona inventario dinámico
+    para ellos.
+    """
+    emergencia_id = emergencia_externa_id.strip()
+    if not emergencia_id:
+        raise ReglaDeNegocioIncumplida("La emergencia externa debe identificarse.")
+
+    _nivel_gravedad(nivel_gravedad)  # Valida el formato sin necesitar el resultado
+    solicitud = _normalizar_aportes(aportes)
+    identificadores = sorted({aporte.identificador_nacional for aporte in solicitud})
+    codigos = sorted({aporte.codigo_recurso for aporte in solicitud})
+
+    organizaciones = db.session.scalars(
+        select(Organizacion)
+        .where(Organizacion.identificador_nacional.in_(identificadores))
+        .order_by(Organizacion.id)
+    ).all()
+    organizaciones_por_id = {org.identificador_nacional: org for org in organizaciones}
+    faltantes = set(identificadores) - set(organizaciones_por_id)
+    if faltantes:
+        raise RecursoNoEncontrado(
+            "No se encontró una organización con el identificador nacional indicado.",
+            detalle={"identificadores_nacionales": sorted(faltantes)},
+        )
+
+    items = db.session.scalars(select(Item).where(Item.codigo_recurso.in_(codigos))).all()
+    items_por_codigo = {item.codigo_recurso: item for item in items}
+    codigos_faltantes = set(codigos) - set(items_por_codigo)
+    if codigos_faltantes:
+        raise RecursoNoEncontrado(
+            "No se encontró un recurso con el código indicado.",
+            detalle={"codigos_recurso": sorted(codigos_faltantes)},
+        )
+
+    ids_organizaciones = [org.id for org in organizaciones]
+    filas_inventario = db.session.execute(
+        select(
+            InventarioItem,
+            Organizacion.identificador_nacional,
+            Item.codigo_recurso,
+        )
+        .join(Inventario, Inventario.id == InventarioItem.inventario_id)
+        .join(Organizacion, Organizacion.id == Inventario.organizacion_id)
+        .join(Item, Item.id == InventarioItem.item_id)
+        .where(
+            Organizacion.id.in_(ids_organizaciones),
+            Item.codigo_recurso.in_(codigos),
+        )
+        .order_by(InventarioItem.id)
+    ).all()
+    inventario_por_clave = {
+        (identificador, codigo): inventario_item
+        for inventario_item, identificador, codigo in filas_inventario
+    }
+
+    motivos: list[MotivoFallo] = []
+    for aporte in solicitud:
+        item = items_por_codigo[aporte.codigo_recurso]
+        # Los consumibles no tienen stock declarado: siempre pasan la validación.
+        if item.consumible:
+            continue
+        inventario_item = inventario_por_clave.get(
+            (aporte.identificador_nacional, aporte.codigo_recurso)
+        )
+        disponible = inventario_item.cantidad_disponible if inventario_item else 0
+        if disponible < aporte.cantidad:
+            motivos.append(
+                MotivoFallo(
+                    identificador_nacional=aporte.identificador_nacional,
+                    codigo_recurso=aporte.codigo_recurso,
+                    cantidad_solicitada=aporte.cantidad,
+                    cantidad_disponible=disponible,
+                    motivo="stock_insuficiente",
+                )
+            )
+
+    return ResultadoValidacion(valido=not motivos, motivos=tuple(motivos))
+
+
 def comprometer_recursos(
     *,
     emergencia_externa_id: str,
@@ -290,6 +393,10 @@ def comprometer_recursos(
             return ResultadoCompromiso(tuple(compromisos_existentes), repetido=True)
 
         for aporte in solicitud:
+            item = items_por_codigo[aporte.codigo_recurso]
+            # Los consumibles no tienen stock declarado ni se verifica disponibilidad.
+            if item.consumible:
+                continue
             inventario_item = inventario_por_clave.get(
                 (aporte.identificador_nacional, aporte.codigo_recurso)
             )
@@ -316,10 +423,13 @@ def comprometer_recursos(
             compromisos_nuevos_por_identificador[identificador] = compromiso
 
         for aporte in solicitud:
-            inventario_item = inventario_por_clave[
+            item = items_por_codigo[aporte.codigo_recurso]
+            inventario_item = inventario_por_clave.get(
                 (aporte.identificador_nacional, aporte.codigo_recurso)
-            ]
-            inventario_item.cantidad_disponible -= aporte.cantidad
+            )
+            # Solo los no consumibles tienen stock declarado; se descuenta su disponibilidad.
+            if not item.consumible:
+                inventario_item.cantidad_disponible -= aporte.cantidad
             compromiso = compromisos_nuevos_por_identificador[aporte.identificador_nacional]
             compromiso.items.append(
                 CompromisoItem(
