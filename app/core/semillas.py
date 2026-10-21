@@ -18,6 +18,8 @@ class ResultadoSemilla:
     entidad: str
     creados: int = 0
     existentes: int = 0
+    # Filas que ya existian y el seeder corrigio (por ejemplo, stock repuesto).
+    actualizados: int = 0
 
     def contar(self, fue_creado: bool) -> None:
         if fue_creado:
@@ -63,5 +65,12 @@ def obtener_o_crear(
 
 
 def importar_seeders() -> None:
-    """Importa los módulos que aportan datos semilla, en orden de dependencia."""
+    """Importa los módulos que aportan datos semilla, en orden de dependencia.
+
+    El orden de los imports es el orden en que `flask seed` ejecuta los seeders: por eso cada
+    uno va en su propio bloque y Ruff no los reordena alfabéticamente.
+    """
     from app.modulos.organizaciones import semillas as _organizaciones  # noqa: F401
+
+    # isort: split
+    from app.modulos.autenticacion import semillas as _autenticacion  # noqa: F401

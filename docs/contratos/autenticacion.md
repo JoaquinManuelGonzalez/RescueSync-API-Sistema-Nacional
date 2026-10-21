@@ -219,6 +219,11 @@ usuarios de la aplicación web (hoy los tres actores están mapeados solo a `wal
 No hay endpoint para crear cuentas: se crean con la consola de Flask, contra la base local o la
 de Supabase.
 
+`flask seed`, que el contenedor corre en cada arranque, crea `admin-sn` y `bonita-rescuesync` si
+no existen y si `SEMILLA_CONTRASENA_ADMIN` / `SEMILLA_SECRETO_BONITA` tienen valor (mínimo 12
+caracteres). Es la forma habitual en Render ([configuración](configuracion.md)). Una cuenta que
+ya existe no se toca: rotar, desactivar y listar se hace con `flask cuentas`.
+
 ```bash
 # Local (dentro del contenedor)
 docker compose exec api flask cuentas crear admin-sn --rol administrador \
