@@ -167,7 +167,7 @@ EJEMPLO_CARGA_DE_INVENTARIO = {
 EJEMPLO_CARGA_DE_CERTIFICACION = {
     "certificacion_id": 6,
     "certificacion_nombre": "Certificación de respuesta ante emergencias",
-    "fecha_emision": "2026-10-21T20:34:46.522534+00:00",
+    "fecha_emision": "2026-10-26T20:00:00.000+00:00",
     "id": 14,
     "nivel_certificacion": "baja",
 }
@@ -181,7 +181,8 @@ class CatalogoCertificaciones(MethodView):
         200,
         CatalogoCertificacionesSchema,
         example=EJEMPLO_CATALOGO_CERTIFICACIONES,
-        description="Muestra todas las certificaciones registradas en el Sistema Nacional.",
+        description="Muestra todas las certificaciones registradas en el Sistema Nacional "
+        "(sin filtros).",
     )
     def get(self, args):
         """Consultar el catálogo de certificaciones."""
@@ -212,7 +213,7 @@ class OrganizacionesHabilitadas(MethodView):
         200,
         OrganizacionesPaginadasSchema,
         example=EJEMPLO_ONGS_HABILITADAS,
-        description="Muestra todas las ONGs con `nivel_certificacion` alto.",
+        description="Muestra todas las ONGs (con filtro por `nivel_certificacion == alto`).",
     )
     @blueprint_organizaciones.arguments(
         ConsultaOrganizacionesQuerySchema,
