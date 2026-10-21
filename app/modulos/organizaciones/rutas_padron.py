@@ -45,7 +45,7 @@ EJEMPLO_ALTA_ONG = {
     "actualizada_en": "2026-10-21T21:43:42.744Z",
 }
 
-EJEMPLO_CONFLICTO_ESTADO = {
+EJEMPLO_CONFLICTO_ALTA_ONG = {
     "error": {
         "codigo": "CONFLICTO_DE_ESTADO",
         "detalle": {
@@ -72,7 +72,7 @@ EJEMPLO_HABILITACION_ONG = {
     "tipo": "ong",
 }
 
-EJEMPLO_CONFLICTO = {
+EJEMPLO_CONFLICTO_HABILITACION = {
     "error": {
         "codigo": "CONFLICTO_DE_ESTADO",
         "detalle": {
@@ -99,7 +99,7 @@ EJEMPLO_CAMBIO_HABILITACION = {
     "tipo": "ong",
 }
 
-BAD_REQUEST_HABILITACION = {
+EJEMPLO_ERROR_400_HABILITACION = {
     "error": {
         "codigo": "SOLICITUD_INVALIDA",
         "detalle": {"json": {"estado": ["Must be one of: pendiente, habilitada, suspendida."]}},
@@ -107,6 +107,60 @@ BAD_REQUEST_HABILITACION = {
         "mensaje": "La solicitud tiene campos inválidos o incompletos.",
         "timestamp": "2026-10-26T20:00:00.000Z",
     }
+}
+
+EJEMPLO_ERROR_400_ALTA_ONG = {
+    "error": {
+        "codigo": "SOLICITUD_INVALIDA",
+        "detalle": {"json": ["Invalid JSON body."]},
+        "id_correlacion": "e7e3910...",
+        "mensaje": "La solicitud tiene campos inválidos o incompletos.",
+        "timestamp": "2026-10-26T20:00:00.000Z",
+    }
+}
+
+EJEMPLO_ERROR_404_ONG = {
+    "error": {
+        "codigo": "RECURSO_NO_ENCONTRADO",
+        "detalle": {"cuit": "30-11111111-9"},
+        "id_correlacion": "e7e3910...",
+        "mensaje": "No hay ninguna organización con ese CUIT en el padrón nacional.",
+        "timestamp": "2026-10-26T20:00:00.000Z",
+    }
+}
+
+EJEMPLO_HISTORIAL_HABILITACIONES = {
+    "cuit": "30-99999999-7",
+    "estado_actual": "habilitada",
+    "registros": [
+        {
+            "caso_bonita": None,
+            "cuenta": None,
+            "estado_anterior": None,
+            "estado_nuevo": "habilitada",
+            "fecha": "2026-10-26T20:00:00.000000+00:00",
+            "motivo": "Certificación sanitaria aprobada.",
+            "usuario_bonita": None,
+        },
+        {
+            "caso_bonita": None,
+            "cuenta": None,
+            "estado_anterior": "habilitada",
+            "estado_nuevo": "suspendida",
+            "fecha": "2026-11-26T20:00:00.000000+00:00",
+            "motivo": "Certificación sanitaria vencida.",
+            "usuario_bonita": None,
+        },
+        {
+            "caso_bonita": None,
+            "cuenta": None,
+            "estado_anterior": "suspendida",
+            "estado_nuevo": "habilitada",
+            "fecha": "2026-12-26T20:00:00.000000+00:00",
+            "motivo": "Certificación sanitaria renovada.",
+            "usuario_bonita": None,
+        },
+    ],
 }
 
 
@@ -139,13 +193,22 @@ class AltaDeOrganizacion(MethodView):
         },
     )
     @blueprint_padron.response(
-        201, OrganizacionPadron, description="ONG registrada (pendiente).", example=EJEMPLO_ALTA_ONG
+        201,
+        OrganizacionPadron,
+        description="ONG registrada (pendiente).",
+        example=EJEMPLO_ALTA_ONG,
     )
     @blueprint_padron.alt_response(
         409,
         schema=RespuestaError,
-        example=EJEMPLO_CONFLICTO_ESTADO,
+        example=EJEMPLO_CONFLICTO_ALTA_ONG,
         description="Ya hay una organización con ese CUIT, nombre o mail (`detalle.campo`).",
+    )
+    @blueprint_padron.alt_response(
+        400,
+        schema=RespuestaError,
+        example=EJEMPLO_ERROR_400_ALTA_ONG,
+        description="Formato de petición JSON inválido.",
     )
     def post(self, datos):
         """Dar de alta una ONG (onboarding)
@@ -169,6 +232,7 @@ class OrganizacionPorCuit(MethodView):
         404,
         schema=RespuestaError,
         description=DESCRIPCION_404,
+        example=EJEMPLO_ERROR_404_ONG,
     )
     def get(self, cuit):
         """Consultar una ONG por CUIT
@@ -186,14 +250,27 @@ class Habilitacion(MethodView):
         PeticionCambioHabilitacion,
         example={"estado": "suspendida", "motivo": "Certificación sanitaria vencida."},
     )
-    @blueprint_padron.response(200, OrganizacionPadron, example=EJEMPLO_CAMBIO_HABILITACION)
-    @blueprint_padron.alt_response(404, schema=RespuestaError, description=DESCRIPCION_404)
-    @blueprint_padron.alt_response(400, schema=RespuestaError, example=BAD_REQUEST_HABILITACION)
+    @blueprint_padron.response(
+        200,
+        OrganizacionPadron,
+        example=EJEMPLO_CAMBIO_HABILITACION,
+    )
+    @blueprint_padron.alt_response(
+        404,
+        schema=RespuestaError,
+        description=DESCRIPCION_404,
+        example=EJEMPLO_ERROR_404_ONG,
+    )
+    @blueprint_padron.alt_response(
+        400,
+        schema=RespuestaError,
+        example=EJEMPLO_ERROR_400_HABILITACION,
+    )
     @blueprint_padron.alt_response(
         409,
         schema=RespuestaError,
         description="La transición no está permitida desde el estado actual.",
-        example=EJEMPLO_CONFLICTO,
+        example=EJEMPLO_CONFLICTO_HABILITACION,
     )
     def patch(self, datos, cuit):
         """Cambiar el estado de habilitación
@@ -211,8 +288,17 @@ class Habilitacion(MethodView):
 @blueprint_padron.route("/<string:cuit>/habilitacion/historial")
 class HistorialDeHabilitacion(MethodView):
     @blueprint_padron.requiere_rol(Rol.sistema, Rol.administrador)
-    @blueprint_padron.response(200, HistorialHabilitacionRespuesta)
-    @blueprint_padron.alt_response(404, schema=RespuestaError, description=DESCRIPCION_404)
+    @blueprint_padron.response(
+        200,
+        HistorialHabilitacionRespuesta,
+        example=EJEMPLO_HISTORIAL_HABILITACIONES,
+    )
+    @blueprint_padron.alt_response(
+        404,
+        schema=RespuestaError,
+        description=DESCRIPCION_404,
+        example=EJEMPLO_ERROR_404_ONG,
+    )
     def get(self, cuit):
         """Ver el historial de habilitación
 
