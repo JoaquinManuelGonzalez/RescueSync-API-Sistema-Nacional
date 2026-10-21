@@ -32,6 +32,83 @@ blueprint_padron = Blueprint(
 
 DESCRIPCION_404 = "No hay ninguna organización con ese CUIT en el padrón."
 
+EJEMPLO_ALTA_ONG = {
+    "id": 0,
+    "cuit": "30-71555444-2",
+    "nombre": "Red Solidaria Chascomús",
+    "tipo": "ong",
+    "mail_contacto": "contacto@redsolidaria.example",
+    "telefono_contacto": "+54 2241 555-000",
+    "estado_habilitacion": "pendiente",
+    "habilitada": True,
+    "motivo_estado": "string",
+    "actualizada_en": "2026-10-21T21:43:42.744Z",
+}
+
+EJEMPLO_CONFLICTO_ESTADO = {
+    "error": {
+        "codigo": "CONFLICTO_DE_ESTADO",
+        "detalle": {
+            "campo": "cuit",
+            "cuit": "30-71555444-2",
+            "estado_habilitacion": "pendiente",
+        },
+        "id_correlacion": "e7e3910...",
+        "mensaje": "Ya existe una organización en el padrón con ese CUIT.",
+        "timestamp": "2026-10-26T20:00:00.000Z",
+    }
+}
+
+EJEMPLO_HABILITACION_ONG = {
+    "actualizada_en": "2026-10-26T20:00:00.00+00:00",
+    "cuit": "30-99999999-5",
+    "estado_habilitacion": "habilitada",
+    "habilitada": True,
+    "id": 0,
+    "mail_contacto": "ongsolidaria@rescuesync.ej",
+    "motivo_estado": "Estado inicial del padrón (datos de demostración).",
+    "nombre": "La Solidaria",
+    "telefono_contacto": None,
+    "tipo": "ong",
+}
+
+EJEMPLO_CONFLICTO = {
+    "error": {
+        "codigo": "CONFLICTO_DE_ESTADO",
+        "detalle": {
+            "estado_actual": "suspendida",
+            "estado_pedido": "suspendida",
+            "transiciones_permitidas": ["habilitada"],
+        },
+        "id_correlacion": "e7e3910...",
+        "mensaje": "La organización ya está suspendida.",
+        "timestamp": "2026-10-21T21:57:34.164Z",
+    }
+}
+
+EJEMPLO_CAMBIO_HABILITACION = {
+    "actualizada_en": "2026-10-26T20:00:00.00+00:00",
+    "cuit": "30-99999999-7",
+    "estado_habilitacion": "suspendida",
+    "habilitada": False,
+    "id": 0,
+    "mail_contacto": "ongsolidaria@rescuesync.ej",
+    "motivo_estado": "Certificación sanitaria vencida.",
+    "nombre": "La Solidaria",
+    "telefono_contacto": None,
+    "tipo": "ong",
+}
+
+BAD_REQUEST_HABILITACION = {
+    "error": {
+        "codigo": "SOLICITUD_INVALIDA",
+        "detalle": {"json": {"estado": ["Must be one of: pendiente, habilitada, suspendida."]}},
+        "id_correlacion": "e7e3910...",
+        "mensaje": "La solicitud tiene campos inválidos o incompletos.",
+        "timestamp": "2026-10-26T20:00:00.000Z",
+    }
+}
+
 
 def _ficha(organizacion: Organizacion) -> dict:
     return {
@@ -61,10 +138,13 @@ class AltaDeOrganizacion(MethodView):
             "telefono_contacto": "+54 2241 555-000",
         },
     )
-    @blueprint_padron.response(201, OrganizacionPadron, description="ONG registrada (pendiente).")
+    @blueprint_padron.response(
+        201, OrganizacionPadron, description="ONG registrada (pendiente).", example=EJEMPLO_ALTA_ONG
+    )
     @blueprint_padron.alt_response(
         409,
         schema=RespuestaError,
+        example=EJEMPLO_CONFLICTO_ESTADO,
         description="Ya hay una organización con ese CUIT, nombre o mail (`detalle.campo`).",
     )
     def post(self, datos):
@@ -80,8 +160,16 @@ class AltaDeOrganizacion(MethodView):
 @blueprint_padron.route("/<string:cuit>")
 class OrganizacionPorCuit(MethodView):
     @blueprint_padron.requiere_rol(Rol.sistema, Rol.administrador)
-    @blueprint_padron.response(200, OrganizacionPadron)
-    @blueprint_padron.alt_response(404, schema=RespuestaError, description=DESCRIPCION_404)
+    @blueprint_padron.response(
+        200,
+        OrganizacionPadron,
+        example=EJEMPLO_HABILITACION_ONG,
+    )
+    @blueprint_padron.alt_response(
+        404,
+        schema=RespuestaError,
+        description=DESCRIPCION_404,
+    )
     def get(self, cuit):
         """Consultar una ONG por CUIT
 
@@ -98,12 +186,14 @@ class Habilitacion(MethodView):
         PeticionCambioHabilitacion,
         example={"estado": "suspendida", "motivo": "Certificación sanitaria vencida."},
     )
-    @blueprint_padron.response(200, OrganizacionPadron)
+    @blueprint_padron.response(200, OrganizacionPadron, example=EJEMPLO_CAMBIO_HABILITACION)
     @blueprint_padron.alt_response(404, schema=RespuestaError, description=DESCRIPCION_404)
+    @blueprint_padron.alt_response(400, schema=RespuestaError, example=BAD_REQUEST_HABILITACION)
     @blueprint_padron.alt_response(
         409,
         schema=RespuestaError,
         description="La transición no está permitida desde el estado actual.",
+        example=EJEMPLO_CONFLICTO,
     )
     def patch(self, datos, cuit):
         """Cambiar el estado de habilitación
