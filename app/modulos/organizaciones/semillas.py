@@ -296,10 +296,16 @@ def sembrar_inventarios() -> list[ResultadoSemilla]:
 
         for nombre_item, cantidad in stock.items():
             item = Item.query.filter_by(nombre=nombre_item).one()
-            _, creado = obtener_o_crear(
+            inventario_item, creado = obtener_o_crear(
                 InventarioItem,
                 claves={"inventario_id": inventario.id, "item_id": item.id},
                 valores={"cantidad_disponible": cantidad},
             )
             resultado_items.contar(creado)
+            # Reposicion: el seed corre en cada deploy y deja el deposito de demostracion al menos
+            # con su stock inicial, para que las pruebas no lo agoten. Nunca baja una cantidad ni
+            # toca los compromisos, que ya descontaron lo suyo al registrarse.
+            if inventario_item.cantidad_disponible < cantidad:
+                inventario_item.cantidad_disponible = cantidad
+                resultado_items.actualizados += 1
     return [resultado_inventarios, resultado_items]

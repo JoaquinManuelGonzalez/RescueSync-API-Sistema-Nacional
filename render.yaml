@@ -57,6 +57,14 @@ services:
         value: produccion
       - key: LOG_LEVEL
         value: INFO
+      # Contrasenas con las que `flask seed` crea, en cada deploy, las cuentas admin-sn y
+      # bonita-rescuesync si todavia no existen (app/modulos/autenticacion/semillas.py). Nunca
+      # cambian una cuenta que ya existe: para rotar se usa `flask cuentas crear` (README).
+      # Alfanumericas y de al menos 12 caracteres. La de Bonita es su parametro snClientSecret.
+      - key: SEMILLA_CONTRASENA_ADMIN
+        sync: false
+      - key: SEMILLA_SECRETO_BONITA
+        sync: false
       # Secretos futuros que no se puedan generar se declaran asi, sin valor:
       #   - key: NOMBRE_DEL_SECRETO
       #     sync: false

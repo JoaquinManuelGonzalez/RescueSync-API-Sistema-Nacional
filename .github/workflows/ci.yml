@@ -66,6 +66,8 @@ jobs:
             echo "APP_ENV=local"
             echo "SECRET_KEY=$(openssl rand -hex 32)"
             echo "JWT_SECRET_KEY=$(openssl rand -hex 32)"
+            echo "SEMILLA_CONTRASENA_ADMIN=$(openssl rand -hex 16)"
+            echo "SEMILLA_SECRETO_BONITA=$(openssl rand -hex 16)"
             echo "PORT=8000"
             echo "LOG_LEVEL=INFO"
             echo "POSTGRES_USER=sistema_nacional"
@@ -77,10 +79,17 @@ jobs:
       - name: Levantar docker compose (db + api de desarrollo)
         run: docker compose up -d --build --wait --wait-timeout 180
 
+      # El entrypoint ya cargo los datos semilla al arrancar: volver a correr el seed no crea nada
+      # (idempotencia contra PostgreSQL real, no solo SQLite) y las cuentas salen del .env de CI.
       - name: Smoke test del entorno local
         run: |
           curl --fail --silent --show-error localhost:8000/health
           docker compose exec -T api flask db current | grep -q "(head)"
+          docker compose exec -T api flask seed > "$RUNNER_TEMP/seed.log"
+          cat "$RUNNER_TEMP/seed.log"
+          grep -q "organizaciones/organizaciones: 0 creados" "$RUNNER_TEMP/seed.log"
+          grep -q "cuentas/cuentas: 0 creados, 2 existentes" "$RUNNER_TEMP/seed.log"
+          docker compose exec -T api flask cuentas listar | grep -q "admin-sn"
 
       # La misma imagen que construye Render: target por defecto (produccion), PORT=10000.
       - name: Construir la imagen de produccion

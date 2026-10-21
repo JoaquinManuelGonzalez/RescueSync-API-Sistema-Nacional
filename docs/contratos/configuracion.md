@@ -21,6 +21,16 @@ RescueSync, reducido a lo que usa la API.
 | `JWT_EXPIRACION_MINUTOS` | N | `60` | Vida de los tokens que emite `/login`, entre 1 y 1440 minutos. El conector de Bonita pide uno nuevo antes del vencimiento | `60` |
 | `DATABASE_SSLMODE` | N | (vacío) | Si tiene valor, se agrega como `sslmode` a la URL de la base. Vacío para el PostgreSQL local | `require` (la conexión a Supabase viaja por internet) |
 
+### Leídas por `flask seed` (`app/modulos/autenticacion/semillas.py`)
+
+No pasan por `app/core/configuracion.py` ni quedan en `app.config`: el seeder las lee del entorno
+solo mientras corre. El contenedor ejecuta `flask seed` en cada arranque (`entrypoint.sh`).
+
+| Variable | Obligatoria (S/N) | Valor por defecto | Descripción | En Render |
+|---|---|---|---|---|
+| `SEMILLA_CONTRASENA_ADMIN` | N | (vacío) | Contraseña con la que se crea la cuenta `admin-sn` (rol `administrador`) si no existe. Mínimo 12 caracteres; vacía, la cuenta se omite. Nunca cambia una cuenta existente | Cargada a mano en el dashboard (`sync: false`) |
+| `SEMILLA_SECRETO_BONITA` | N | (vacío) | Igual, para la cuenta `bonita-rescuesync` (rol `sistema`). Es el `snClientSecret` del proceso de Bonita | Cargada a mano en el dashboard (`sync: false`) |
+
 ### Leídas por la infraestructura (nunca por la aplicación)
 
 | Variable | Quién la usa | Valor por defecto | Descripción |
@@ -66,10 +76,11 @@ corriendo `docker compose up api`.
   los pide solo al crear el Blueprint por primera vez; si se agregan después, se cargan a mano en
   **Service → Environment** del dashboard. Una variable nueva con `generateValue: true` (como
   `JWT_SECRET_KEY`) la crea Render al sincronizar el Blueprint, si todavía no existe.
-- **Credenciales de las cuentas de la API** (la de Bonita y la del administrador) no son
-  variables de entorno: viven hasheadas en la tabla `cuentas` y se crean con `flask cuentas`
-  ([autenticación](autenticacion.md), sección 8). El secreto de Bonita se carga en el parámetro
-  `snClientSecret` del proceso.
+- **Credenciales de las cuentas de la API** (la de Bonita y la del administrador) viven
+  hasheadas en la tabla `cuentas`. Se crean con `flask seed` a partir de
+  `SEMILLA_CONTRASENA_ADMIN` y `SEMILLA_SECRETO_BONITA` (solo si la cuenta no existe) o con
+  `flask cuentas`, que también las rota ([autenticación](autenticacion.md), sección 8). El
+  secreto de Bonita se carga en el parámetro `snClientSecret` del proceso.
 - **`.env.supabase`** (opcional, solo para quien administra la base): archivo local con la
   `DATABASE_URL` de Supabase, para comandos puntuales contra la nube con `docker run
   --env-file`. Lo ignoran git y Docker (`.env.*`). No reemplaza al `.env`.

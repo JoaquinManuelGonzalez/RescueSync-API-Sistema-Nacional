@@ -32,7 +32,15 @@ def entorno_completo(monkeypatch):
     """Deja seteadas todas las variables obligatorias y limpia las opcionales."""
     for nombre, valor in ENTORNO_MINIMO.items():
         monkeypatch.setenv(nombre, valor)
-    for nombre in ("APP_ENV", "PORT", "LOG_LEVEL", "DATABASE_SSLMODE", "JWT_EXPIRACION_MINUTOS"):
+    for nombre in (
+        "APP_ENV",
+        "PORT",
+        "LOG_LEVEL",
+        "DATABASE_SSLMODE",
+        "JWT_EXPIRACION_MINUTOS",
+        "SEMILLA_CONTRASENA_ADMIN",
+        "SEMILLA_SECRETO_BONITA",
+    ):
         monkeypatch.delenv(nombre, raising=False)
     return monkeypatch
 
