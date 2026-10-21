@@ -48,11 +48,141 @@ def _datos_paginados(elementos: list, pagina: int, por_pagina: int, total: int) 
     }
 
 
+EJEMPLO_ONGS_HABILITADAS = {
+    "elementos": [
+        {
+            "certificaciones": [
+                {
+                    "id": 0,
+                    "nivel_certificacion": "alta",
+                    "nombre": "Certificación de atención sanitaria",
+                },
+                {
+                    "id": 1,
+                    "nivel_certificacion": "alta",
+                    "nombre": "Certificación de abastecimiento de agua",
+                },
+            ],
+            "cuit": "30-99999999-7",
+            "id": 6,
+            "mail_contacto": "solidaria@rescuesync.ej",
+            "nombre": "La Solidaria",
+        },
+        {
+            "certificaciones": [
+                {
+                    "id": 2,
+                    "nivel_certificacion": "alta",
+                    "nombre": "Certificación de distribución de alimentos",
+                },
+            ],
+            "cuit": "30-88888888-6",
+            "id": 10,
+            "mail_contacto": "federada@rescuesync.ej",
+            "nombre": "La Federada",
+        },
+    ],
+    "pagina": 1,
+    "por_pagina": 20,
+    "total": 2,
+}
+
+EJEMPLO_CATALOGO_CERTIFICACIONES = {
+    "elementos": [
+        {"id": 0, "nombre": "Certificación de abastecimiento de agua", "tipo": "agua"},
+        {
+            "id": 1,
+            "nombre": "Habilitación nacional para el transporte de productos alimenticios",
+            "tipo": "alimentos",
+        },
+    ],
+    "pagina": 1,
+    "por_pagina": 20,
+    "total": 2,
+}
+
+EJEMPLO_RECURSOS_DISPONIBLES = {
+    "elementos": [
+        {
+            "comprometido": 0,
+            "consumible": True,
+            "disponible": 100,
+            "id": 0,
+            "nombre": "Botellas de agua",
+            "tipo": "agua",
+            "total": 100,
+            "unidad_medida": "unidades",
+        },
+        {
+            "comprometido": 1,
+            "consumible": False,
+            "disponible": 19,
+            "id": 1,
+            "nombre": "Enfermeros",
+            "tipo": "personal_medico",
+            "total": 20,
+            "unidad_medida": "personas",
+        },
+    ],
+    "pagina": 1,
+    "por_pagina": 20,
+    "total": 2,
+}
+
+EJEMPLO_DISPONIBILIDAD_ONG = {
+    "elementos": [
+        {
+            "comprometido": 0,
+            "consumible": False,
+            "disponible": 10,
+            "id": 2,
+            "nombre": "Paramédicos",
+            "tipo": "personal_medico",
+            "total": 10,
+            "unidad_medida": "personas",
+        },
+        {
+            "comprometido": 0,
+            "consumible": True,
+            "disponible": 100,
+            "id": 18,
+            "nombre": "Raciones de alimento no perecedero",
+            "tipo": "alimentos",
+            "total": 100,
+            "unidad_medida": "raciones",
+        },
+    ],
+    "pagina": 1,
+    "por_pagina": 20,
+    "total": 2,
+}
+
+EJEMPLO_CARGA_DE_INVENTARIO = {
+    "cantidad_disponible": 1,
+    "id": 29,
+    "item_id": 13,
+    "item_nombre": "Pañales para adulto",
+}
+
+EJEMPLO_CARGA_DE_CERTIFICACION = {
+    "certificacion_id": 6,
+    "certificacion_nombre": "Certificación de respuesta ante emergencias",
+    "fecha_emision": "2026-10-21T20:34:46.522534+00:00",
+    "id": 14,
+    "nivel_certificacion": "baja",
+}
+
+
 @blueprint_organizaciones.route("/certificaciones")
 class CatalogoCertificaciones(MethodView):
     @blueprint_organizaciones.requiere_rol(Rol.sistema, Rol.administrador)
     @blueprint_organizaciones.arguments(PaginacionQuerySchema, location="query")
-    @blueprint_organizaciones.response(200, CatalogoCertificacionesSchema)
+    @blueprint_organizaciones.response(
+        200,
+        CatalogoCertificacionesSchema,
+        example=EJEMPLO_CATALOGO_CERTIFICACIONES,
+        description="Muestra todas las certificaciones registradas en el Sistema Nacional.",
+    )
     def get(self, args):
         """Consultar el catálogo de certificaciones."""
         pagina = args["pagina"]
@@ -78,11 +208,16 @@ class CatalogoCertificaciones(MethodView):
 @blueprint_organizaciones.route("/ongs")
 class OrganizacionesHabilitadas(MethodView):
     @blueprint_organizaciones.requiere_rol(Rol.sistema, Rol.administrador)
+    @blueprint_organizaciones.response(
+        200,
+        OrganizacionesPaginadasSchema,
+        example=EJEMPLO_ONGS_HABILITADAS,
+        description="Muestra todas las ONGs con `nivel_certificacion` alto.",
+    )
     @blueprint_organizaciones.arguments(
         ConsultaOrganizacionesQuerySchema,
         location="query",
     )
-    @blueprint_organizaciones.response(200, OrganizacionesPaginadasSchema)
     def get(self, args):
         """Listar ONGs habilitadas con filtros de certificación."""
         pagina = args["pagina"]
@@ -137,9 +272,14 @@ class DisponibilidadGlobal(MethodView):
         ConsultaDisponibilidadQuerySchema,
         location="query",
     )
-    @blueprint_organizaciones.response(200, DisponibilidadPaginadaSchema)
+    @blueprint_organizaciones.response(
+        200,
+        DisponibilidadPaginadaSchema,
+        example=EJEMPLO_RECURSOS_DISPONIBLES,
+        description="Sin aplicar filtro, muestra todos los recursos disponibles de todas las ONGs.",
+    )
     def get(self, args):
-        """Consultar la disponibilidad global de recursos."""
+        """Consultar la disponibilidad global de recursos con filtro por tipo."""
         pagina = args["pagina"]
         por_pagina = args["por_pagina"]
         total_subconsulta = (
@@ -219,14 +359,16 @@ class DisponibilidadGlobal(MethodView):
 @blueprint_organizaciones.route("/ongs/<string:cuit>/recursos/disponibilidad")
 class DisponibilidadDeOrganizacion(MethodView):
     @blueprint_organizaciones.requiere_rol(Rol.sistema, Rol.administrador)
-    @blueprint_organizaciones.arguments(
-        ConsultaDisponibilidadQuerySchema,
-        location="query",
+    @blueprint_organizaciones.arguments(ConsultaDisponibilidadQuerySchema, location="query")
+    @blueprint_organizaciones.response(
+        200,
+        DisponibilidadPaginadaSchema,
+        example=EJEMPLO_DISPONIBILIDAD_ONG,
+        description="Sin filtro por tipo, muestra todos los recursos disponibles de una ONG.",
     )
-    @blueprint_organizaciones.response(200, DisponibilidadPaginadaSchema)
     @blueprint_organizaciones.alt_response(404, schema=RespuestaError)
     def get(self, args, cuit):
-        """Consultar la disponibilidad de recursos de una organización."""
+        """Consultar la disponibilidad de recursos de una organización con filtro por tipo."""
         organizacion = servicios.obtener_por_cuit(cuit)
         pagina = args["pagina"]
         por_pagina = args["por_pagina"]
@@ -302,7 +444,12 @@ class DisponibilidadDeOrganizacion(MethodView):
 class CargaDeInventario(MethodView):
     @blueprint_organizaciones.requiere_rol(Rol.administrador)
     @blueprint_organizaciones.arguments(PeticionCargaInventarioSchema)
-    @blueprint_organizaciones.response(201, InventarioCargadoSchema)
+    @blueprint_organizaciones.response(
+        201,
+        InventarioCargadoSchema,
+        example=EJEMPLO_CARGA_DE_INVENTARIO,
+        description="Cargar un item que la ONG no posea en su inventario.",
+    )
     @blueprint_organizaciones.alt_response(404, schema=RespuestaError)
     @blueprint_organizaciones.alt_response(409, schema=RespuestaError)
     def post(self, datos, cuit):
@@ -320,7 +467,12 @@ class CargaDeInventario(MethodView):
 class CargaDeCertificacion(MethodView):
     @blueprint_organizaciones.requiere_rol(Rol.administrador)
     @blueprint_organizaciones.arguments(PeticionCargaCertificacionSchema)
-    @blueprint_organizaciones.response(201, CertificacionCargadaSchema)
+    @blueprint_organizaciones.response(
+        201,
+        CertificacionCargadaSchema,
+        example=EJEMPLO_CARGA_DE_CERTIFICACION,
+        description="Cargar una certificación que la ONG no posea.",
+    )
     @blueprint_organizaciones.alt_response(404, schema=RespuestaError)
     @blueprint_organizaciones.alt_response(409, schema=RespuestaError)
     def post(self, datos, cuit):
