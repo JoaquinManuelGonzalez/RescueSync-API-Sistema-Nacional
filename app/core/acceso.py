@@ -114,6 +114,15 @@ class Blueprint(flask_smorest.Blueprint):
             documentado = self.alt_response(
                 401,
                 schema=RespuestaError,
+                example={
+                    "error": {
+                        "codigo": "NO_AUTENTICADO",
+                        "detalle": {"motivo": "token_expirado"},
+                        "id_correlacion": "e7e3910...",
+                        "mensaje": "El token venció. Pedí uno nuevo en /login.",
+                        "timestamp": "2026-10-26T20:00:00.000Z",
+                    }
+                },
                 description=(
                     "Falta el token, es inválido, venció o su cuenta está desactivada "
                     "(`detalle.motivo`)."
@@ -122,6 +131,18 @@ class Blueprint(flask_smorest.Blueprint):
             return self.alt_response(
                 403,
                 schema=RespuestaError,
+                example={
+                    "error": {
+                        "codigo": "PERMISO_DENEGADO",
+                        "detalle": {
+                            "rol": "rol_actual",
+                            "roles_permitidos": ["rol_permitido_1", "rol_permitido_2"],
+                        },
+                        "id_correlacion": "e7e3910...",
+                        "mensaje": "Las credenciales no habilitan esta operación.",
+                        "timestamp": "2026-10-26T20:00:00.000Z",
+                    }
+                },
                 description=(
                     f"El rol del token no habilita la operación. Roles permitidos: {nombres}."
                 ),
