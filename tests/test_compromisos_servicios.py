@@ -441,4 +441,3 @@ def test_validar_restricciones_consumible_ignora_stock(base_de_datos):
 
     assert resultado.valido is True
     assert resultado.motivos == ()
-

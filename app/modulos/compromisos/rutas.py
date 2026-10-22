@@ -119,6 +119,7 @@ class CompromisoDeRecursos(MethodView):
         }
         return cuerpo, 200 if resultado.repetido else 201
 
+
 EJEMPLO_VALIDACION = {
     "emergencia_externa_id": "emergencia-demo-01",
     "nivel_gravedad": "MEDIA",

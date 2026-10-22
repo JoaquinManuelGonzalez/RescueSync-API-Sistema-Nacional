@@ -285,4 +285,3 @@ def test_validar_recursos_requiere_rol_sistema(cliente, cabeceras):
     )
 
     assert respuesta.status_code == 403
-
