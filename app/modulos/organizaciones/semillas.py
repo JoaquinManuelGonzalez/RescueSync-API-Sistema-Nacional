@@ -47,6 +47,9 @@ SUSPENDIDAS_DE_DEMOSTRACION: dict[str, str] = {
     ),
 }
 MOTIVO_SEMILLA = "Estado inicial del padrón (datos de demostración)."
+NIVELES_CERTIFICACION_DE_DEMOSTRACION = {
+    "Manos Unidas": NivelCertificacion.media,
+}
 
 CERTIFICACIONES: dict[str, tuple[tuple[str, TipoItem], ...]] = {
     "Cruz Solidaria": (
@@ -260,7 +263,7 @@ def sembrar_certificaciones() -> list[ResultadoSemilla]:
                 Certificacion,
                 claves={"nombre": nombre, "tipo": tipo},
             )
-            _, asignada = obtener_o_crear(
+            asignacion, asignada = obtener_o_crear(
                 OrganizacionCertificacion,
                 claves={
                     "organizacion_id": organizacion.id,
@@ -270,6 +273,10 @@ def sembrar_certificaciones() -> list[ResultadoSemilla]:
                     "nivel_riesgo_permitido": NivelCertificacion.alta,
                     "fecha_emision": datetime.now(UTC),
                 },
+            )
+            asignacion.nivel_riesgo_permitido = NIVELES_CERTIFICACION_DE_DEMOSTRACION.get(
+                nombre_org,
+                NivelCertificacion.alta,
             )
             resultado.contar(creada or asignada)
     return [resultado]
