@@ -28,6 +28,7 @@ Campos presentes en todo evento:
 | `excepcion_no_contemplada` | `ERROR` | `mensaje` (tipo de la excepción), `id_correlacion` |
 | `salud_degradada` | `ERROR` | `mensaje` (tipo del error), `componente` |
 | `configuracion_invalida` | `ERROR` | `mensaje` (qué variable falta o es inválida) |
+| `semilla_omitida` | `WARN` | `mensaje` (qué variable no alcanza el largo mínimo), `cuenta`. Lo emite `flask seed`, nunca con el valor |
 
 `GET /health` no genera eventos: lo consultan el healthcheck de Docker y el de Render cada pocos
 segundos.

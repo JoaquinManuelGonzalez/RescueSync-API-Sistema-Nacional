@@ -1,19 +1,28 @@
 from __future__ import annotations
 
 import pytest
+from sqlalchemy import select
+from werkzeug.security import check_password_hash
 
+from app.core.acceso import Rol
 from app.extensiones import db
+from app.modulos.autenticacion.modelos import Cuenta
+from app.modulos.autenticacion.servicios import autenticar
 from app.modulos.organizaciones import semillas
 from app.modulos.organizaciones.modelos import (
     Certificacion,
     EstadoHabilitacion,
     HistorialHabilitacion,
+    Inventario,
     InventarioItem,
     Item,
     Organizacion,
     OrganizacionCertificacion,
     TipoItem,
 )
+
+CONTRASENA_ADMIN = "contrasena-admin-de-prueba"
+SECRETO_BONITA = "secreto-bonita-de-prueba-123"
 
 
 @pytest.fixture
@@ -23,6 +32,28 @@ def base_de_datos(app):
         yield
         db.session.remove()
         db.drop_all()
+
+
+def _sembrar() -> dict:
+    """Corre todos los seeders, confirma y devuelve los resultados por entidad."""
+    from app.core.semillas import SEEDERS, importar_seeders
+
+    importar_seeders()
+    resultados = {
+        resultado.entidad: resultado for seeder in SEEDERS for resultado in seeder.funcion()
+    }
+    db.session.commit()
+    return resultados
+
+
+def _stock(organizacion: str, item: str) -> InventarioItem:
+    return db.session.scalar(
+        select(InventarioItem)
+        .join(Inventario, Inventario.id == InventarioItem.inventario_id)
+        .join(Organizacion, Organizacion.id == Inventario.organizacion_id)
+        .join(Item, Item.id == InventarioItem.item_id)
+        .where(Organizacion.nombre == organizacion, Item.nombre == item)
+    )
 
 
 def test_sembrar_carga_datos_y_es_idempotente(base_de_datos):
@@ -165,3 +196,75 @@ def test_semillas_dejan_estado_e_historial_de_habilitacion(base_de_datos):
         if nombre not in suspendidas
     )
     assert db.session.query(HistorialHabilitacion).count() == len(estados)
+
+
+def test_semillas_reponen_el_stock_sin_bajarlo(base_de_datos):
+    _sembrar()
+    agua = _stock("Cruz Solidaria", "Agua potable envasada")
+    paramedicos = _stock("Cruz Solidaria", "Paramédicos")
+    agua.cantidad_disponible = 0
+    paramedicos.cantidad_disponible = 50
+    db.session.commit()
+
+    resultados = _sembrar()
+
+    stock_semilla = semillas.INVENTARIOS["Cruz Solidaria"][2]
+    assert agua.cantidad_disponible == stock_semilla["Agua potable envasada"]
+    assert paramedicos.cantidad_disponible == 50
+    assert resultados["inventario_items"].actualizados == 1
+    assert resultados["inventario_items"].creados == 0
+
+
+def test_comando_flask_seed_informa_el_stock_repuesto(app):
+    with app.app_context():
+        db.create_all()
+        runner = app.test_cli_runner()
+        assert runner.invoke(args=["seed"]).exit_code == 0
+        _stock("Cruz Solidaria", "Agua potable envasada").cantidad_disponible = 0
+        db.session.commit()
+
+        resultado = runner.invoke(args=["seed"])
+
+        assert resultado.exit_code == 0, resultado.output
+        assert "inventarios/inventario_items: 0 creados" in resultado.output
+        assert "1 repuestos" in resultado.output
+        assert "organizaciones/organizaciones: 0 creados" in resultado.output
+
+        db.session.remove()
+        db.drop_all()
+
+
+def test_semillas_crean_las_cuentas_desde_el_entorno(base_de_datos, monkeypatch):
+    monkeypatch.setenv("SEMILLA_CONTRASENA_ADMIN", CONTRASENA_ADMIN)
+    monkeypatch.setenv("SEMILLA_SECRETO_BONITA", SECRETO_BONITA)
+
+    resultados = _sembrar()
+
+    assert resultados["cuentas"].creados == 2
+    admin = autenticar("admin-sn", CONTRASENA_ADMIN, modo="json")
+    bonita = autenticar("bonita-rescuesync", SECRETO_BONITA, modo="client_credentials")
+    assert admin is not None and admin.rol is Rol.administrador
+    assert bonita is not None and bonita.rol is Rol.sistema
+    assert _sembrar()["cuentas"].existentes == 2
+
+
+@pytest.mark.parametrize("valor", ["", "   ", "muy-corta"])
+def test_semillas_omiten_cuentas_sin_contrasena_valida(base_de_datos, monkeypatch, valor):
+    monkeypatch.setenv("SEMILLA_CONTRASENA_ADMIN", valor)
+
+    resultados = _sembrar()
+
+    assert resultados["cuentas"].creados == 0
+    assert db.session.query(Cuenta).count() == 0
+
+
+def test_semillas_no_tocan_una_cuenta_existente(base_de_datos, monkeypatch, crear_cuenta):
+    crear_cuenta("admin-sn", Rol.administrador, contrasena="rotada-a-mano-con-flask", activa=False)
+    monkeypatch.setenv("SEMILLA_CONTRASENA_ADMIN", CONTRASENA_ADMIN)
+
+    resultados = _sembrar()
+
+    cuenta = db.session.scalar(select(Cuenta).where(Cuenta.usuario == "admin-sn"))
+    assert resultados["cuentas"].existentes == 1
+    assert cuenta.activa is False
+    assert check_password_hash(cuenta.password_hash, "rotada-a-mano-con-flask")

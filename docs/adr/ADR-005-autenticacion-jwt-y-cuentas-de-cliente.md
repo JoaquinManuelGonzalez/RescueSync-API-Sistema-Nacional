@@ -96,7 +96,8 @@ Groovy. La diferenciación de la épica se redujo a lo que el sistema usa:
 - Todo endpoint nuevo usa el `Blueprint` de `app.core.acceso` y `@blp.requiere_rol(...)`.
   `tests/test_rutas_protegidas.py` falla si una ruta responde sin token.
 - `JWT_SECRET_KEY` es obligatoria (mínimo 32 caracteres) en todos los entornos.
-- Las cuentas se crean con `flask cuentas`, nunca con un endpoint público, y sus credenciales no
-  se commitean: las de la entrega van en el documento de la entrega.
+- Las cuentas se crean con `flask cuentas` (o con `flask seed` a partir de variables de entorno
+  secretas, solo si no existen), nunca con un endpoint público, y sus credenciales no se
+  commitean: las de la entrega van en el documento de la entrega.
 - Cada conector REST de Bonita que llame a la API usa el modo OAUTH2 (Client Credentials) con
   los parámetros del proceso (`docs/contratos/autenticacion.md`, sección 7).

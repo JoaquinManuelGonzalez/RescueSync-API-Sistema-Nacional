@@ -88,17 +88,20 @@ cd RescueSync-API-Sistema-Nacional
    # {"db":"ok","status":"ok"}
    ```
 
-`docker compose ps` tiene que mostrar `db` y `api` como `healthy`. Las migraciones se aplican
-solas al arrancar el contenedor `api`.
+`docker compose ps` tiene que mostrar `db` y `api` como `healthy`. Al arrancar, el contenedor
+`api` aplica las migraciones y carga los datos semilla (`flask seed`, idempotente).
 
-Para usar los endpoints hace falta una cuenta. La primera vez, cargar los datos semilla y crear
-las dos cuentas de prueba ([autenticación](#autenticación-y-prueba-con-swagger-y-postman)):
+Para usar los endpoints hace falta una cuenta. Hay dos formas de crear las dos cuentas de prueba
+([autenticación](#autenticación-y-prueba-con-swagger-y-postman)):
 
-```bash
-docker compose exec api flask seed
-docker compose exec api flask cuentas crear admin-sn --rol administrador   # pide la contraseña
-docker compose exec api flask cuentas crear bonita-rescuesync --rol sistema --generar
-```
+- Completar `SEMILLA_CONTRASENA_ADMIN` y `SEMILLA_SECRETO_BONITA` en el `.env` (12 caracteres
+  como mínimo) y reiniciar con `docker compose up -d`: el seed crea las cuentas que falten.
+- O crearlas a mano:
+
+  ```bash
+  docker compose exec api flask cuentas crear admin-sn --rol administrador   # pide la contraseña
+  docker compose exec api flask cuentas crear bonita-rescuesync --rol sistema --generar
+  ```
 
 ### Alternativa: API fuera del contenedor (con uv)
 
@@ -192,6 +195,8 @@ Detalle completo en [`docs/contratos/configuracion.md`](docs/contratos/configura
 | `PORT` | No | `8000` | Puerto de la API (Render inyecta `10000`) |
 | `LOG_LEVEL` | No | `DEBUG` | `DEBUG`, `INFO`, `WARN`, `ERROR` |
 | `DATABASE_SSLMODE` | No | (vacío) | `require` en la nube (Supabase) |
+| `SEMILLA_CONTRASENA_ADMIN` | No | (vacío) | Si tiene valor, `flask seed` crea la cuenta `admin-sn` cuando no existe |
+| `SEMILLA_SECRETO_BONITA` | No | (vacío) | Si tiene valor, `flask seed` crea la cuenta `bonita-rescuesync` cuando no existe |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Sí (compose) | `sistema_nacional` | Credenciales del PostgreSQL local |
 | `POSTGRES_HOST_PORT` | No | `5433` | Puerto del host para PostgreSQL |
 
@@ -209,7 +214,7 @@ docker compose down -v                  # detener y BORRAR la base local
 
 docker compose exec api flask db upgrade                 # aplicar migraciones a mano
 docker compose exec api flask db migrate -m "mensaje"    # generar una migración
-docker compose exec api flask seed                       # cargar datos semilla idempotentes
+docker compose exec api flask seed                       # recargar datos semilla (ya corre al arrancar)
 docker compose exec api flask cuentas listar             # cuentas que pueden pedir tokens
 docker compose exec api pytest                           # tests dentro del contenedor
 docker compose exec api ruff check .                     # linter dentro del contenedor
@@ -235,7 +240,9 @@ Todo endpoint, salvo `/login`, `/health`, `/docs` y `/openapi.json`, exige un JW
 | `admin-sn` | `administrador` | Dar de alta ONGs y cambiar su habilitación (Swagger, Postman) |
 | `bonita-rescuesync` | `sistema` | Los conectores REST del proceso de Bonita |
 
-Las credenciales de la nube no están en el repositorio: van en el documento de la entrega.
+Las credenciales de la nube no están en el repositorio: van en el documento de la entrega. En
+Render, las cuentas se crean solas en el deploy a partir de `SEMILLA_CONTRASENA_ADMIN` y
+`SEMILLA_SECRETO_BONITA` ([runbook](#runbook-crear-cuentas-en-supabase)).
 
 **Swagger** (`/docs`):
 
@@ -254,6 +261,12 @@ Datos de demostración del padrón: las mismas organizaciones y CUIT que la apli
 `habilitada` salvo **Cruz Roja Argentina - Filial Bahía Blanca** (`30-99999999-4`), que está
 `suspendida` para mostrar el caso de una ONG que no puede ofertar.
 
+Los datos semilla se cargan en cada arranque del contenedor, también en cada deploy de Render.
+Crean lo que falta sin duplicar y **reponen el stock** de los inventarios de demostración: un
+ítem que quedó por debajo de su cantidad semilla vuelve a esa cantidad, uno que está por encima
+no se toca, y los compromisos no se modifican. El estado de habilitación de las organizaciones
+que ya existían tampoco se toca.
+
 ## Despliegue en Render
 
 | Recurso | Nombre | Plan | Región | Dónde se configura |
@@ -267,9 +280,11 @@ de Supabase no expira (decisión en
 
 **Cómo se despliega:** push a la rama vinculada → GitHub Actions corre el CI → si **todos** los
 checks pasan, Render construye la imagen desde el `Dockerfile` y la despliega
-(`autoDeployTrigger: checksPass`). Al arrancar, el contenedor aplica las migraciones; cuando
-`/health` responde 200, Render le pasa el tráfico sin cortar el servicio. Si el CI o el
-arranque fallan, sigue corriendo la versión anterior.
+(`autoDeployTrigger: checksPass`). Al arrancar, el contenedor aplica las migraciones y carga los
+datos semilla en Supabase; cuando `/health` responde 200, Render le pasa el tráfico sin cortar
+el servicio. Si el CI, las migraciones o el arranque fallan, sigue corriendo la versión anterior.
+Si falla solo el seed, la API arranca igual con los datos que ya tiene la base y los logs muestran
+`[entrypoint] AVISO: flask seed fallo`.
 
 - La rama vinculada es `main`: todo cambio llega por Pull Request (ver `CONTRIBUTING.md`).
 - Los cambios solo en `docs/**` o en archivos `.md` no despliegan. Para saltear el deploy de
@@ -313,13 +328,14 @@ arranque fallan, sigue corriendo la versión anterior.
 1. Cuenta en [Render](https://dashboard.render.com) (con "Sign up with GitHub") y la app de
    Render instalada en GitHub con acceso a este repositorio.
 2. Dashboard → **New → Blueprint** → conectar este repositorio → rama vinculada. Render pide el
-   valor de `DATABASE_URL`: pegar la URI de Supabase. **Deploy Blueprint**: Render crea el web
-   service y genera `SECRET_KEY`.
+   valor de `DATABASE_URL` (pegar la URI de Supabase) y de `SEMILLA_CONTRASENA_ADMIN` y
+   `SEMILLA_SECRETO_BONITA` (contraseñas alfanuméricas largas para las cuentas de la API).
+   **Deploy Blueprint**: Render crea el web service y genera `SECRET_KEY`.
 3. Esperar el primer deploy en la pestaña **Events** y verificar `/health`. En Supabase,
    **SQL Editor** → `select version_num from alembic_version;` muestra la última migración.
 
-Si el Blueprint ya existía, Render no vuelve a pedir `DATABASE_URL` (ignora `sync: false` al
-actualizar): se carga en servicio → **Environment** → **Save and deploy**.
+Si el Blueprint ya existía, Render no vuelve a pedir las variables con `sync: false` al
+actualizar: se cargan en servicio → **Environment** → **Save and deploy**.
 
 ## Base de datos: local y nube
 
@@ -330,6 +346,7 @@ Hay **dos bases con el mismo esquema**, y nunca se mezclan:
 | Dónde | Contenedor `db` del `docker-compose.yml` (`postgres:17-trixie`) | Proyecto de Supabase (PostgreSQL 17) |
 | Quién la crea | `docker compose up`, en un volumen propio de cada integrante | Se creó una sola vez en el dashboard ([Crear el entorno de cero](#crear-el-entorno-de-cero)) |
 | Quién crea las tablas | Las migraciones, al arrancar el contenedor `api` | Las migraciones, al arrancar cada deploy en Render |
+| Quién carga los datos semilla | `flask seed`, al arrancar el contenedor `api` | `flask seed`, al arrancar cada deploy en Render |
 | Datos | Descartables (`docker compose down -v` la borra) | Compartidos por todo el equipo y por Bonita. **Sin backups** |
 | Cómo se consulta | Adminer o `psql` | SQL Editor o Table Editor de Supabase |
 
@@ -427,8 +444,17 @@ tokens, y los que emite la API en Render se firman con la clave que generó Rend
 
 ### Runbook: crear cuentas en Supabase
 
-Las cuentas de la nube se crean una sola vez desde la PC, con la imagen del commit desplegado.
-`-it` hace falta para que `crear` pueda pedir la contraseña:
+**Forma habitual: desde Render.** En servicio → **Environment**, cargar
+`SEMILLA_CONTRASENA_ADMIN` y `SEMILLA_SECRETO_BONITA` (alfanuméricas, 12 caracteres como mínimo)
+→ **Save and deploy**. En el arranque, `flask seed` crea `admin-sn` y `bonita-rescuesync` si no
+existen; en los logs del deploy aparece `cuentas/cuentas: 2 creados`. El secreto de Bonita es el
+que se carga en el parámetro `snClientSecret` del proceso.
+
+El seed **nunca cambia una cuenta que ya existe**: ni la contraseña ni el estado. Si en los logs
+aparece `cuentas/cuentas: 0 creados, 2 existentes` y no se conoce su contraseña, o hay que rotar
+un secreto, se usa `flask cuentas crear` desde la PC, con la imagen del commit desplegado. Si se
+rota, conviene actualizar también la variable de Render para que las dos coincidan. `-it` hace
+falta para que `crear` pueda pedir la contraseña:
 
 ```bash
 docker run --rm -it --env-file .env.supabase -e SECRET_KEY=x -e DATABASE_SSLMODE=require \
@@ -445,6 +471,14 @@ docker run --rm -it --env-file .env.supabase -e SECRET_KEY=x -e DATABASE_SSLMODE
 El secreto generado para Bonita se muestra una sola vez: cargarlo en el parámetro
 `snClientSecret` del proceso. Volver a correr `crear` sobre una cuenta existente rota su
 contraseña.
+
+Para ver qué cuentas hay en Supabase, con la misma imagen:
+
+```bash
+docker run --rm --env-file .env.supabase -e SECRET_KEY=x -e DATABASE_SSLMODE=require \
+  -e JWT_SECRET_KEY=solo-para-comandos-de-consola-sin-tokens \
+  --entrypoint flask sistema-nacional:local cuentas listar
+```
 
 ### El archivo `.env.supabase`
 
