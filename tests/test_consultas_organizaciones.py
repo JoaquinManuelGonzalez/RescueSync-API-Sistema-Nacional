@@ -100,7 +100,9 @@ def test_consulta_ongs_filtra_por_certificacion_y_nivel(base_de_datos, cliente, 
     ]
 
 
-def test_disponibilidad_descuenta_solo_compromisos_activos(base_de_datos, cliente, cabeceras):
+def test_disponibilidad_expone_inventario_y_compromisos_activos(
+    base_de_datos, cliente, cabeceras
+):
     organizacion = Organizacion(
         tipo=TipoOrganizacion.ong,
         nombre="ONG de recursos",
@@ -113,7 +115,7 @@ def test_disponibilidad_descuenta_solo_compromisos_activos(base_de_datos, client
         tipo=TipoItem.agua,
         unidad_medida="litros",
     )
-    inventario_item = InventarioItem(cantidad_disponible=10, item=item)
+    inventario_item = InventarioItem(cantidad_disponible=7, item=item)
     organizacion.inventario = Inventario(items=[inventario_item])
     compromiso_activo = Compromiso(
         organizacion=organizacion,

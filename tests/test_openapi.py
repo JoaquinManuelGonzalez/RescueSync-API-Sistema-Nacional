@@ -57,6 +57,20 @@ def test_documenta_evaluacion_de_ofertas(especificacion):
     operacion = especificacion["paths"]["/ofertas/evaluacion"]["post"]
 
     assert "application/json" in operacion["requestBody"]["content"]
+    request_body = operacion["requestBody"]["content"]["application/json"]
+    assert "example" in request_body
+    assert "examples" not in request_body
+    assert request_body["example"]["emergencia_id"] == 14
+    respuestas = operacion["responses"]["200"]["content"]["application/json"]["examples"]
+    assert set(respuestas) == {
+        "ok_principal_y_apoyo",
+        "rechazo_organizacion_no_registrada",
+        "rechazo_stock_insuficiente",
+        "rechazo_sin_certificacion",
+    }
+    assert respuestas["ok_principal_y_apoyo"]["value"]["ofertas"][0]["items"][0][
+        "aportes"
+    ][0]["clasificacion"] == "principal"
     assert "200" in operacion["responses"]
     assert "401" in operacion["responses"]
     assert "403" in operacion["responses"]
