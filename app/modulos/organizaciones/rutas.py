@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ejemplos import (
+from app.modulos.organizaciones.ejemplos import (
     EJEMPLO_CARGA_DE_CERTIFICACION,
     EJEMPLO_CARGA_DE_INVENTARIO,
     EJEMPLO_CATALOGO_CERTIFICACIONES,

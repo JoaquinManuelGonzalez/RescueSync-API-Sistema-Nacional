@@ -7,7 +7,7 @@ nueva y cómo la habilita o la suspende con el tiempo.
 
 from __future__ import annotations
 
-from ejemplos import (
+from app.modulos.organizaciones.ejemplos import (
     EJEMPLO_ALTA_ONG,
     EJEMPLO_CAMBIO_HABILITACION,
     EJEMPLO_ERROR_400,
