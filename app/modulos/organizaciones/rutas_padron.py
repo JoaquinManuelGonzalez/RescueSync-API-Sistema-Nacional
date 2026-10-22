@@ -12,6 +12,16 @@ from flask.views import MethodView
 from app.core.acceso import Blueprint, Rol, actor_actual
 from app.core.errores import RespuestaError
 from app.modulos.organizaciones import servicios
+from app.modulos.organizaciones.ejemplos import (
+    EJEMPLO_ALTA_ONG,
+    EJEMPLO_CAMBIO_HABILITACION,
+    EJEMPLO_ERROR_400,
+    EJEMPLO_ERROR_404_ONG,
+    EJEMPLO_ERROR_409_HABILITACION,
+    EJEMPLO_ERROR_409_ONG,
+    EJEMPLO_HABILITACION_ONG,
+    EJEMPLO_HISTORIAL_HABILITACIONES,
+)
 from app.modulos.organizaciones.modelos import EstadoHabilitacion, Organizacion
 from app.modulos.organizaciones.schemas_padron import (
     EJEMPLO_CUIT,
@@ -61,11 +71,23 @@ class AltaDeOrganizacion(MethodView):
             "telefono_contacto": "+54 2241 555-000",
         },
     )
-    @blueprint_padron.response(201, OrganizacionPadron, description="ONG registrada (pendiente).")
+    @blueprint_padron.response(
+        201,
+        OrganizacionPadron,
+        description="ONG registrada (pendiente).",
+        example=EJEMPLO_ALTA_ONG,
+    )
     @blueprint_padron.alt_response(
         409,
         schema=RespuestaError,
+        example=EJEMPLO_ERROR_409_ONG,
         description="Ya hay una organización con ese CUIT, nombre o mail (`detalle.campo`).",
+    )
+    @blueprint_padron.alt_response(
+        400,
+        schema=RespuestaError,
+        example=EJEMPLO_ERROR_400,
+        description="El JSON está incompleto o contiene campos inválidos.",
     )
     def post(self, datos):
         """Dar de alta una ONG (onboarding)
@@ -80,8 +102,17 @@ class AltaDeOrganizacion(MethodView):
 @blueprint_padron.route("/<string:cuit>")
 class OrganizacionPorCuit(MethodView):
     @blueprint_padron.requiere_rol(Rol.sistema, Rol.administrador)
-    @blueprint_padron.response(200, OrganizacionPadron)
-    @blueprint_padron.alt_response(404, schema=RespuestaError, description=DESCRIPCION_404)
+    @blueprint_padron.response(
+        200,
+        OrganizacionPadron,
+        example=EJEMPLO_HABILITACION_ONG,
+    )
+    @blueprint_padron.alt_response(
+        404,
+        schema=RespuestaError,
+        description=DESCRIPCION_404,
+        example=EJEMPLO_ERROR_404_ONG,
+    )
     def get(self, cuit):
         """Consultar una ONG por CUIT
 
@@ -98,12 +129,28 @@ class Habilitacion(MethodView):
         PeticionCambioHabilitacion,
         example={"estado": "suspendida", "motivo": "Certificación sanitaria vencida."},
     )
-    @blueprint_padron.response(200, OrganizacionPadron)
-    @blueprint_padron.alt_response(404, schema=RespuestaError, description=DESCRIPCION_404)
+    @blueprint_padron.response(
+        200,
+        OrganizacionPadron,
+        example=EJEMPLO_CAMBIO_HABILITACION,
+    )
+    @blueprint_padron.alt_response(
+        404,
+        schema=RespuestaError,
+        description=DESCRIPCION_404,
+        example=EJEMPLO_ERROR_404_ONG,
+    )
+    @blueprint_padron.alt_response(
+        400,
+        schema=RespuestaError,
+        example=EJEMPLO_ERROR_400,
+        description="El JSON está incompleto o contiene campos inválidos.",
+    )
     @blueprint_padron.alt_response(
         409,
         schema=RespuestaError,
         description="La transición no está permitida desde el estado actual.",
+        example=EJEMPLO_ERROR_409_HABILITACION,
     )
     def patch(self, datos, cuit):
         """Cambiar el estado de habilitación
@@ -121,8 +168,17 @@ class Habilitacion(MethodView):
 @blueprint_padron.route("/<string:cuit>/habilitacion/historial")
 class HistorialDeHabilitacion(MethodView):
     @blueprint_padron.requiere_rol(Rol.sistema, Rol.administrador)
-    @blueprint_padron.response(200, HistorialHabilitacionRespuesta)
-    @blueprint_padron.alt_response(404, schema=RespuestaError, description=DESCRIPCION_404)
+    @blueprint_padron.response(
+        200,
+        HistorialHabilitacionRespuesta,
+        example=EJEMPLO_HISTORIAL_HABILITACIONES,
+    )
+    @blueprint_padron.alt_response(
+        404,
+        schema=RespuestaError,
+        description=DESCRIPCION_404,
+        example=EJEMPLO_ERROR_404_ONG,
+    )
     def get(self, cuit):
         """Ver el historial de habilitación
 

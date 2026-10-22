@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from flask.views import MethodView
+from flask_smorest.error_handler import ErrorSchema
 from sqlalchemy import func, select
 
 from app.core.acceso import Blueprint, Rol
@@ -10,6 +11,20 @@ from app.core.errores import RespuestaError
 from app.extensiones import db
 from app.modulos.compromisos.modelos import Compromiso, CompromisoItem, EstadoCompromiso
 from app.modulos.organizaciones import servicios
+from app.modulos.organizaciones.ejemplos import (
+    EJEMPLO_CARGA_DE_CERTIFICACION,
+    EJEMPLO_CARGA_DE_INVENTARIO,
+    EJEMPLO_CATALOGO_CERTIFICACIONES,
+    EJEMPLO_DISPONIBILIDAD_ONG,
+    EJEMPLO_ERROR_400_CAMPOS_INVALIDOS,
+    EJEMPLO_ERROR_400_CUIT,
+    EJEMPLO_ERROR_400_INVALID_JSON,
+    EJEMPLO_ERROR_404_ONG,
+    EJEMPLO_ERROR_409_CERTIFICACION,
+    EJEMPLO_ERROR_409_ITEM,
+    EJEMPLO_ONGS_HABILITADAS,
+    EJEMPLO_RECURSOS_DISPONIBLES,
+)
 from app.modulos.organizaciones.modelos import (
     Certificacion,
     EstadoHabilitacion,
@@ -50,9 +65,21 @@ def _datos_paginados(elementos: list, pagina: int, por_pagina: int, total: int) 
 
 @blueprint_organizaciones.route("/certificaciones")
 class CatalogoCertificaciones(MethodView):
-    @blueprint_organizaciones.requiere_rol(Rol.sistema, Rol.administrador)
-    @blueprint_organizaciones.arguments(PaginacionQuerySchema, location="query")
-    @blueprint_organizaciones.response(200, CatalogoCertificacionesSchema)
+    @blueprint_organizaciones.requiere_rol(
+        Rol.sistema,
+        Rol.administrador,
+    )
+    @blueprint_organizaciones.arguments(
+        PaginacionQuerySchema,
+        location="query",
+    )
+    @blueprint_organizaciones.response(
+        200,
+        CatalogoCertificacionesSchema,
+        example=EJEMPLO_CATALOGO_CERTIFICACIONES,
+        description="Muestra todas las certificaciones registradas en el Sistema Nacional "
+        "(sin filtros).",
+    )
     def get(self, args):
         """Consultar el catálogo de certificaciones."""
         pagina = args["pagina"]
@@ -77,12 +104,26 @@ class CatalogoCertificaciones(MethodView):
 
 @blueprint_organizaciones.route("/ongs")
 class OrganizacionesHabilitadas(MethodView):
-    @blueprint_organizaciones.requiere_rol(Rol.sistema, Rol.administrador)
+    @blueprint_organizaciones.requiere_rol(
+        Rol.sistema,
+        Rol.administrador,
+    )
+    @blueprint_organizaciones.response(
+        200,
+        OrganizacionesPaginadasSchema,
+        example=EJEMPLO_ONGS_HABILITADAS,
+        description="Muestra todas las ONGs (con filtro por `nivel_certificacion == alto`).",
+    )
+    @blueprint_organizaciones.alt_response(
+        400,
+        schema=ErrorSchema,
+        example=EJEMPLO_ERROR_400_CAMPOS_INVALIDOS,
+        description="El JSON está incompleto o contiene campos inválidos.",
+    )
     @blueprint_organizaciones.arguments(
         ConsultaOrganizacionesQuerySchema,
         location="query",
     )
-    @blueprint_organizaciones.response(200, OrganizacionesPaginadasSchema)
     def get(self, args):
         """Listar ONGs habilitadas con filtros de certificación."""
         pagina = args["pagina"]
@@ -137,9 +178,14 @@ class DisponibilidadGlobal(MethodView):
         ConsultaDisponibilidadQuerySchema,
         location="query",
     )
-    @blueprint_organizaciones.response(200, DisponibilidadPaginadaSchema)
+    @blueprint_organizaciones.response(
+        200,
+        DisponibilidadPaginadaSchema,
+        example=EJEMPLO_RECURSOS_DISPONIBLES,
+        description="Sin aplicar filtro, muestra todos los recursos disponibles de todas las ONGs.",
+    )
     def get(self, args):
-        """Consultar la disponibilidad global de recursos."""
+        """Consultar la disponibilidad global de recursos con filtro por tipo."""
         pagina = args["pagina"]
         por_pagina = args["por_pagina"]
         total_subconsulta = (
@@ -219,14 +265,26 @@ class DisponibilidadGlobal(MethodView):
 @blueprint_organizaciones.route("/ongs/<string:cuit>/recursos/disponibilidad")
 class DisponibilidadDeOrganizacion(MethodView):
     @blueprint_organizaciones.requiere_rol(Rol.sistema, Rol.administrador)
-    @blueprint_organizaciones.arguments(
-        ConsultaDisponibilidadQuerySchema,
-        location="query",
+    @blueprint_organizaciones.arguments(ConsultaDisponibilidadQuerySchema, location="query")
+    @blueprint_organizaciones.response(
+        200,
+        DisponibilidadPaginadaSchema,
+        example=EJEMPLO_DISPONIBILIDAD_ONG,
+        description="Sin filtro por tipo, muestra todos los recursos disponibles de una ONG.",
     )
-    @blueprint_organizaciones.response(200, DisponibilidadPaginadaSchema)
-    @blueprint_organizaciones.alt_response(404, schema=RespuestaError)
+    @blueprint_organizaciones.alt_response(
+        404,
+        schema=RespuestaError,
+        example=EJEMPLO_ERROR_404_ONG,
+        description="No existe una organización o un código de recurso indicado.",
+    )
+    @blueprint_organizaciones.alt_response(
+        400,
+        schema=RespuestaError,
+        example=EJEMPLO_ERROR_400_CUIT,
+    )
     def get(self, args, cuit):
-        """Consultar la disponibilidad de recursos de una organización."""
+        """Consultar la disponibilidad de recursos de una organización con filtro por tipo."""
         organizacion = servicios.obtener_por_cuit(cuit)
         pagina = args["pagina"]
         por_pagina = args["por_pagina"]
@@ -302,9 +360,30 @@ class DisponibilidadDeOrganizacion(MethodView):
 class CargaDeInventario(MethodView):
     @blueprint_organizaciones.requiere_rol(Rol.administrador)
     @blueprint_organizaciones.arguments(PeticionCargaInventarioSchema)
-    @blueprint_organizaciones.response(201, InventarioCargadoSchema)
-    @blueprint_organizaciones.alt_response(404, schema=RespuestaError)
-    @blueprint_organizaciones.alt_response(409, schema=RespuestaError)
+    @blueprint_organizaciones.response(
+        201,
+        InventarioCargadoSchema,
+        example=EJEMPLO_CARGA_DE_INVENTARIO,
+        description="Cargar un item que la ONG no posea en su inventario.",
+    )
+    @blueprint_organizaciones.alt_response(
+        404,
+        schema=RespuestaError,
+        example=EJEMPLO_ERROR_404_ONG,
+        description="No existe una organización o un código de recurso indicado.",
+    )
+    @blueprint_organizaciones.alt_response(
+        409,
+        schema=RespuestaError,
+        example=EJEMPLO_ERROR_409_ITEM,
+        description="El recurso ingresado ya existe en el inventario.",
+    )
+    @blueprint_organizaciones.alt_response(
+        400,
+        schema=ErrorSchema,
+        example=EJEMPLO_ERROR_400_INVALID_JSON,
+        description="El JSON está incompleto o contiene campos inválidos.",
+    )
     def post(self, datos, cuit):
         """Cargar un ítem y su cantidad disponible en el inventario de una ONG."""
         registro = servicios.cargar_item(cuit, datos["item_id"], datos["cantidad_disponible"])
@@ -320,9 +399,30 @@ class CargaDeInventario(MethodView):
 class CargaDeCertificacion(MethodView):
     @blueprint_organizaciones.requiere_rol(Rol.administrador)
     @blueprint_organizaciones.arguments(PeticionCargaCertificacionSchema)
-    @blueprint_organizaciones.response(201, CertificacionCargadaSchema)
-    @blueprint_organizaciones.alt_response(404, schema=RespuestaError)
-    @blueprint_organizaciones.alt_response(409, schema=RespuestaError)
+    @blueprint_organizaciones.response(
+        201,
+        CertificacionCargadaSchema,
+        example=EJEMPLO_CARGA_DE_CERTIFICACION,
+        description="Cargar una certificación que la ONG no posea.",
+    )
+    @blueprint_organizaciones.alt_response(
+        404,
+        schema=RespuestaError,
+        example=EJEMPLO_ERROR_404_ONG,
+        description="No existe una organización o un código de recurso indicado.",
+    )
+    @blueprint_organizaciones.alt_response(
+        409,
+        schema=RespuestaError,
+        example=EJEMPLO_ERROR_409_CERTIFICACION,
+        description="La organización ya tiene cargada esa certificación.",
+    )
+    @blueprint_organizaciones.alt_response(
+        400,
+        schema=RespuestaError,
+        example=EJEMPLO_ERROR_400_INVALID_JSON,
+        description="El JSON está incompleto o contiene campos inválidos.",
+    )
     def post(self, datos, cuit):
         """Asignar una certificación y su nivel a una ONG."""
         asignacion = servicios.cargar_certificacion(

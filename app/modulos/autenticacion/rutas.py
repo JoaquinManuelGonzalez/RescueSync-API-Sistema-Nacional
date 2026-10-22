@@ -57,6 +57,38 @@ CUERPO_LOGIN = {
     },
 }
 
+EJEMPLO_ERROR_400_AUTH = {
+    "error": {
+        "codigo": "SOLICITUD_INVALIDA",
+        "detalle": {"json": {"_schema": ["Tipo de dato inválido."]}},
+        "id_correlacion": "e7e3910...",
+        "mensaje": "La solicitud tiene campos inválidos o incompletos.",
+        "timestamp": "2026-10-26T20:00:00.000Z",
+    }
+}
+
+EJEMPLO_ERROR_401_AUTH = {
+    "error": {
+        "codigo": "NO_AUTENTICADO",
+        "detalle": {"motivo": "credenciales_invalidas"},
+        "id_correlacion": "e7e3910...",
+        "mensaje": "Usuario o contraseña incorrectos.",
+        "timestamp": "2026-10-26T20:00:00.000Z",
+    }
+}
+
+EJEMPLO_CUENTA_PROPIA = {
+    "descripcion": "Operador del Sistema Nacional",
+    "rol": "administrador",
+    "token": {
+        "emitido_en": "2026-10-21T23:06:44+00:00",
+        "expira_en": "2026-10-22T00:06:44+00:00",
+        "segundos_restantes": 3292,
+    },
+    "trazabilidad": {"caso_bonita": None, "usuario_bonita": None},
+    "usuario": "admin-sn",
+}
+
 
 @blueprint_autenticacion.route("/login")
 class Login(MethodView):
@@ -78,6 +110,7 @@ class Login(MethodView):
             'JSON: faltan campos (`SOLICITUD_INVALIDA`). Formulario: `{"error": '
             '"invalid_request"}` o `{"error": "unsupported_grant_type"}` (RFC 6749 §5.2).'
         ),
+        example=EJEMPLO_ERROR_400_AUTH,
     )
     @blueprint_autenticacion.alt_response(
         401,
@@ -86,6 +119,7 @@ class Login(MethodView):
             "Credenciales inválidas o cuenta desactivada. JSON: `NO_AUTENTICADO`. "
             'Formulario: `{"error": "invalid_client"}` (RFC 6749 §5.2).'
         ),
+        example=EJEMPLO_ERROR_401_AUTH,
     )
     @blueprint_autenticacion.alt_response(
         415, schema=RespuestaError, description="El cuerpo no es JSON ni formulario."
@@ -166,7 +200,11 @@ def _error_oauth2(estado: int, error: str, descripcion: str, *, basic: bool = Fa
 @blueprint_autenticacion.route("/cuentas/yo")
 class CuentaPropia(MethodView):
     @blueprint_autenticacion.requiere_rol(Rol.sistema, Rol.administrador)
-    @blueprint_autenticacion.response(200, CuentaActual)
+    @blueprint_autenticacion.response(
+        200,
+        CuentaActual,
+        example=EJEMPLO_CUENTA_PROPIA,
+    )
     def get(self):
         """Ver la cuenta del token
 
