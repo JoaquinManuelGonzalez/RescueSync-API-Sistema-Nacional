@@ -11,6 +11,7 @@ from app.modulos.compromisos.servicios import (
     comprometer_recursos,
     informar_finalizacion_ong,
     liberar_recursos,
+    validar_restricciones,
 )
 from app.modulos.organizaciones.modelos import (
     Inventario,
@@ -31,6 +32,7 @@ def base_de_datos(app):
             nombre="Enfermeros",
             tipo=TipoItem.personal_medico,
             unidad_medida="personas",
+            consumible=False,
         )
         organizaciones = []
         for numero, (identificador, cantidad) in enumerate(
@@ -220,7 +222,7 @@ def test_liberar_recursos_devuelve_solo_los_no_consumibles(base_de_datos):
         for fila in db.session.query(InventarioItem).all()
     }
     assert cantidades == {
-        ("30-11111111-1", "RSR-ENFERMEROS"): 6,
+        ("30-11111111-1", "RSR-ENFERMEROS"): 10,
         ("30-11111111-1", "RSR-CAMILLAS"): 5,
         ("30-22222222-2", "RSR-ENFERMEROS"): 8,
         ("30-22222222-2", "RSR-CAMILLAS"): 4,
@@ -330,9 +332,9 @@ def test_ultima_finalizacion_cierra_proyecto_y_devuelve_solo_no_consumibles(base
         for fila in db.session.query(InventarioItem).all()
     }
     assert cantidades == {
-        ("30-11111111-1", "RSR-ENFERMEROS"): 6,
+        ("30-11111111-1", "RSR-ENFERMEROS"): 10,
         ("30-11111111-1", "RSR-CAMILLAS"): 5,
-        ("30-22222222-2", "RSR-ENFERMEROS"): 5,
+        ("30-22222222-2", "RSR-ENFERMEROS"): 8,
         ("30-22222222-2", "RSR-CAMILLAS"): 4,
     }
 
@@ -373,3 +375,70 @@ def test_finalizacion_rechaza_ong_que_no_participa(base_de_datos):
             emergencia_externa_id="13",
             identificador_nacional="30-33333333-3",
         )
+
+
+def test_validar_restricciones_recursos_suficientes_devuelve_valido_true(base_de_datos):
+    resultado = validar_restricciones(
+        emergencia_externa_id="13",
+        nivel_gravedad="MEDIA",
+        aportes=aportes_validos(),
+    )
+
+    assert resultado.valido is True
+    assert resultado.motivos == ()
+    # Comprobar que no hubo efectos colaterales en el inventario ni en compromisos
+    assert db.session.query(Compromiso).count() == 0
+    assert [fila.cantidad_disponible for fila in db.session.query(InventarioItem)] == [10, 8]
+
+
+def test_validar_restricciones_recurso_insuficiente_devuelve_valido_false(base_de_datos):
+    aportes = [
+        AporteSolicitado(
+            identificador_nacional="30-11111111-1",
+            codigo_recurso="RSR-ENFERMEROS",
+            cantidad=15,  # hay 10
+            tipo_asignacion=TipoAsignacion.principal,
+        )
+    ]
+    resultado = validar_restricciones(
+        emergencia_externa_id="13",
+        nivel_gravedad="MEDIA",
+        aportes=aportes,
+    )
+
+    assert resultado.valido is False
+    assert len(resultado.motivos) == 1
+    assert resultado.motivos[0].motivo == "stock_insuficiente"
+    assert resultado.motivos[0].cantidad_disponible == 10
+    assert resultado.motivos[0].cantidad_solicitada == 15
+    assert db.session.query(Compromiso).count() == 0
+
+
+def test_validar_restricciones_consumible_ignora_stock(base_de_datos):
+    item_consumible = Item(
+        codigo_recurso="RSR-AGUA",
+        nombre="Agua",
+        tipo=TipoItem.agua,
+        unidad_medida="litros",
+        consumible=True,
+    )
+    db.session.add(item_consumible)
+    db.session.commit()
+
+    aportes = [
+        AporteSolicitado(
+            identificador_nacional="30-11111111-1",
+            codigo_recurso="RSR-AGUA",
+            cantidad=999999,  # Sin stock declarado en la ONG
+            tipo_asignacion=TipoAsignacion.principal,
+        )
+    ]
+    resultado = validar_restricciones(
+        emergencia_externa_id="13",
+        nivel_gravedad="MEDIA",
+        aportes=aportes,
+    )
+
+    assert resultado.valido is True
+    assert resultado.motivos == ()
+

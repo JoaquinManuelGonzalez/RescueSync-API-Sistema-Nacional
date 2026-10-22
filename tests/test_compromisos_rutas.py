@@ -47,7 +47,7 @@ def inventario_disponible(base_de_datos):
                         nombre="Agua",
                         tipo=TipoItem.agua,
                         unidad_medida="litros",
-                        consumible=True,
+                        consumible=False,
                     ),
                     cantidad_disponible=10,
                 )
@@ -202,7 +202,7 @@ def test_finalizacion_ong_cierra_proyecto_y_devuelve_el_estado(
         "repetido": False,
     }
     assert db.session.query(Compromiso).one().estado.value == "LIBERADO"
-    assert inventario_disponible.inventario.items[0].cantidad_disponible == 6
+    assert inventario_disponible.inventario.items[0].cantidad_disponible == 10
 
 
 def test_finalizacion_ong_requiere_rol_sistema(cliente, cabeceras):
@@ -228,3 +228,61 @@ def test_finalizacion_ong_inexistente_responde_404(cliente, cabeceras, inventari
 
     assert respuesta.status_code == 404
     assert respuesta.get_json()["error"]["codigo"] == "RECURSO_NO_ENCONTRADO"
+
+
+def test_validar_recursos_exitoso_dry_run_sin_efectos_colaterales(
+    cliente,
+    cabeceras,
+    inventario_disponible,
+):
+    respuesta = cliente.post(
+        "/recursos/compromisos/validar",
+        json=PETICION,
+        headers=cabeceras(Rol.sistema),
+    )
+
+    assert respuesta.status_code == 200
+    assert respuesta.get_json() == {
+        "valido": True,
+        "motivos": [],
+    }
+    assert inventario_disponible.inventario.items[0].cantidad_disponible == 10
+    assert db.session.query(Compromiso).count() == 0
+
+
+def test_validar_recursos_stock_insuficiente_responde_200_con_valido_false(
+    cliente,
+    cabeceras,
+    inventario_disponible,
+):
+    peticion = {
+        **PETICION,
+        "aportes": [{**PETICION["aportes"][0], "cantidad": 15}],
+    }
+
+    respuesta = cliente.post(
+        "/recursos/compromisos/validar",
+        json=peticion,
+        headers=cabeceras(Rol.sistema),
+    )
+
+    assert respuesta.status_code == 200
+    datos = respuesta.get_json()
+    assert datos["valido"] is False
+    assert len(datos["motivos"]) == 1
+    assert datos["motivos"][0]["motivo"] == "stock_insuficiente"
+    assert datos["motivos"][0]["cantidad_disponible"] == 10
+    assert datos["motivos"][0]["cantidad_solicitada"] == 15
+    assert inventario_disponible.inventario.items[0].cantidad_disponible == 10
+    assert db.session.query(Compromiso).count() == 0
+
+
+def test_validar_recursos_requiere_rol_sistema(cliente, cabeceras):
+    respuesta = cliente.post(
+        "/recursos/compromisos/validar",
+        json=PETICION,
+        headers=cabeceras(Rol.administrador),
+    )
+
+    assert respuesta.status_code == 403
+

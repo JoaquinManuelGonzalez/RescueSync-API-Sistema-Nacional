@@ -23,15 +23,21 @@ blueprint_compromisos = Blueprint(
 )
 
 EJEMPLO_COMPROMISO = {
-    "emergencia_externa_id": "emergencia-2026-0042",
+    "emergencia_externa_id": "emergencia-demo-01",
     "nivel_gravedad": "MEDIA",
     "aportes": [
         {
-            "identificador_nacional": "30-11111111-1",
-            "codigo_recurso": "RSR-AGUA_POTABLE",
-            "cantidad": 500,
+            "identificador_nacional": "30-65432198-7",
+            "codigo_recurso": "RSR-PARAMEDICOS",
+            "cantidad": 2,
             "tipo_asignacion": "principal",
-        }
+        },
+        {
+            "identificador_nacional": "30-65432198-7",
+            "codigo_recurso": "RSR-AGUA_POTABLE_ENVASADA",
+            "cantidad": 100,
+            "tipo_asignacion": "principal",
+        },
     ],
 }
 
@@ -114,15 +120,21 @@ class CompromisoDeRecursos(MethodView):
         return cuerpo, 200 if resultado.repetido else 201
 
 EJEMPLO_VALIDACION = {
-    "emergencia_externa_id": "emergencia-2026-0042",
+    "emergencia_externa_id": "emergencia-demo-01",
     "nivel_gravedad": "MEDIA",
     "aportes": [
         {
-            "identificador_nacional": "30-11111111-1",
-            "codigo_recurso": "RSR-AGUA_POTABLE",
-            "cantidad": 500,
+            "identificador_nacional": "30-65432198-7",
+            "codigo_recurso": "RSR-PARAMEDICOS",
+            "cantidad": 2,
             "tipo_asignacion": "principal",
-        }
+        },
+        {
+            "identificador_nacional": "30-65432198-7",
+            "codigo_recurso": "RSR-AGUA_POTABLE_ENVASADA",
+            "cantidad": 100,
+            "tipo_asignacion": "principal",
+        },
     ],
 }
 
