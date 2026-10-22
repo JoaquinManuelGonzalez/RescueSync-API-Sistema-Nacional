@@ -7,6 +7,16 @@ nueva y cómo la habilita o la suspende con el tiempo.
 
 from __future__ import annotations
 
+from ejemplos import (
+    EJEMPLO_ALTA_ONG,
+    EJEMPLO_CAMBIO_HABILITACION,
+    EJEMPLO_ERROR_400,
+    EJEMPLO_ERROR_404_ONG,
+    EJEMPLO_ERROR_409_HABILITACION,
+    EJEMPLO_ERROR_409_ONG,
+    EJEMPLO_HABILITACION_ONG,
+    EJEMPLO_HISTORIAL_HABILITACIONES,
+)
 from flask.views import MethodView
 
 from app.core.acceso import Blueprint, Rol, actor_actual
@@ -31,137 +41,6 @@ blueprint_padron = Blueprint(
 )
 
 DESCRIPCION_404 = "No hay ninguna organización con ese CUIT en el padrón."
-
-EJEMPLO_ALTA_ONG = {
-    "id": 0,
-    "cuit": "30-71555444-2",
-    "nombre": "Red Solidaria Chascomús",
-    "tipo": "ong",
-    "mail_contacto": "contacto@redsolidaria.example",
-    "telefono_contacto": "+54 2241 555-000",
-    "estado_habilitacion": "pendiente",
-    "habilitada": True,
-    "motivo_estado": "string",
-    "actualizada_en": "2026-10-21T21:43:42.744Z",
-}
-
-EJEMPLO_CONFLICTO_ALTA_ONG = {
-    "error": {
-        "codigo": "CONFLICTO_DE_ESTADO",
-        "detalle": {
-            "campo": "cuit",
-            "cuit": "30-71555444-2",
-            "estado_habilitacion": "pendiente",
-        },
-        "id_correlacion": "e7e3910...",
-        "mensaje": "Ya existe una organización en el padrón con ese CUIT.",
-        "timestamp": "2026-10-26T20:00:00.000Z",
-    }
-}
-
-EJEMPLO_HABILITACION_ONG = {
-    "actualizada_en": "2026-10-26T20:00:00.00+00:00",
-    "cuit": "30-99999999-5",
-    "estado_habilitacion": "habilitada",
-    "habilitada": True,
-    "id": 0,
-    "mail_contacto": "ongsolidaria@rescuesync.ej",
-    "motivo_estado": "Estado inicial del padrón (datos de demostración).",
-    "nombre": "La Solidaria",
-    "telefono_contacto": None,
-    "tipo": "ong",
-}
-
-EJEMPLO_CONFLICTO_HABILITACION = {
-    "error": {
-        "codigo": "CONFLICTO_DE_ESTADO",
-        "detalle": {
-            "estado_actual": "suspendida",
-            "estado_pedido": "suspendida",
-            "transiciones_permitidas": ["habilitada"],
-        },
-        "id_correlacion": "e7e3910...",
-        "mensaje": "La organización ya está suspendida.",
-        "timestamp": "2026-10-21T21:57:34.164Z",
-    }
-}
-
-EJEMPLO_CAMBIO_HABILITACION = {
-    "actualizada_en": "2026-10-26T20:00:00.00+00:00",
-    "cuit": "30-99999999-7",
-    "estado_habilitacion": "suspendida",
-    "habilitada": False,
-    "id": 0,
-    "mail_contacto": "ongsolidaria@rescuesync.ej",
-    "motivo_estado": "Certificación sanitaria vencida.",
-    "nombre": "La Solidaria",
-    "telefono_contacto": None,
-    "tipo": "ong",
-}
-
-EJEMPLO_ERROR_400_HABILITACION = {
-    "error": {
-        "codigo": "SOLICITUD_INVALIDA",
-        "detalle": {"json": {"estado": ["Must be one of: pendiente, habilitada, suspendida."]}},
-        "id_correlacion": "e7e3910...",
-        "mensaje": "La solicitud tiene campos inválidos o incompletos.",
-        "timestamp": "2026-10-26T20:00:00.000Z",
-    }
-}
-
-EJEMPLO_ERROR_400_ALTA_ONG = {
-    "error": {
-        "codigo": "SOLICITUD_INVALIDA",
-        "detalle": {"json": ["Invalid JSON body."]},
-        "id_correlacion": "e7e3910...",
-        "mensaje": "La solicitud tiene campos inválidos o incompletos.",
-        "timestamp": "2026-10-26T20:00:00.000Z",
-    }
-}
-
-EJEMPLO_ERROR_404_ONG = {
-    "error": {
-        "codigo": "RECURSO_NO_ENCONTRADO",
-        "detalle": {"cuit": "30-11111111-9"},
-        "id_correlacion": "e7e3910...",
-        "mensaje": "No hay ninguna organización con ese CUIT en el padrón nacional.",
-        "timestamp": "2026-10-26T20:00:00.000Z",
-    }
-}
-
-EJEMPLO_HISTORIAL_HABILITACIONES = {
-    "cuit": "30-99999999-7",
-    "estado_actual": "habilitada",
-    "registros": [
-        {
-            "caso_bonita": None,
-            "cuenta": None,
-            "estado_anterior": None,
-            "estado_nuevo": "habilitada",
-            "fecha": "2026-10-26T20:00:00.000000+00:00",
-            "motivo": "Certificación sanitaria aprobada.",
-            "usuario_bonita": None,
-        },
-        {
-            "caso_bonita": None,
-            "cuenta": None,
-            "estado_anterior": "habilitada",
-            "estado_nuevo": "suspendida",
-            "fecha": "2026-11-26T20:00:00.000000+00:00",
-            "motivo": "Certificación sanitaria vencida.",
-            "usuario_bonita": None,
-        },
-        {
-            "caso_bonita": None,
-            "cuenta": None,
-            "estado_anterior": "suspendida",
-            "estado_nuevo": "habilitada",
-            "fecha": "2026-12-26T20:00:00.000000+00:00",
-            "motivo": "Certificación sanitaria renovada.",
-            "usuario_bonita": None,
-        },
-    ],
-}
 
 
 def _ficha(organizacion: Organizacion) -> dict:
@@ -201,14 +80,14 @@ class AltaDeOrganizacion(MethodView):
     @blueprint_padron.alt_response(
         409,
         schema=RespuestaError,
-        example=EJEMPLO_CONFLICTO_ALTA_ONG,
+        example=EJEMPLO_ERROR_409_ONG,
         description="Ya hay una organización con ese CUIT, nombre o mail (`detalle.campo`).",
     )
     @blueprint_padron.alt_response(
         400,
         schema=RespuestaError,
-        example=EJEMPLO_ERROR_400_ALTA_ONG,
-        description="Formato de petición JSON inválido.",
+        example=EJEMPLO_ERROR_400,
+        description="El JSON está incompleto o contiene campos inválidos.",
     )
     def post(self, datos):
         """Dar de alta una ONG (onboarding)
@@ -264,13 +143,14 @@ class Habilitacion(MethodView):
     @blueprint_padron.alt_response(
         400,
         schema=RespuestaError,
-        example=EJEMPLO_ERROR_400_HABILITACION,
+        example=EJEMPLO_ERROR_400,
+        description="El JSON está incompleto o contiene campos inválidos.",
     )
     @blueprint_padron.alt_response(
         409,
         schema=RespuestaError,
         description="La transición no está permitida desde el estado actual.",
-        example=EJEMPLO_CONFLICTO_HABILITACION,
+        example=EJEMPLO_ERROR_409_HABILITACION,
     )
     def patch(self, datos, cuit):
         """Cambiar el estado de habilitación
