@@ -1566,10 +1566,20 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"emergencia_externa_id\": \"emergencia-postman-01\",\n  \"nivel_gravedad\": \"MEDIA\",\n  \"aportes\": [\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-AGUA_POTABLE_ENVASADA\",\n      \"cantidad\": 100,\n      \"tipo_asignacion\": \"principal\"\n    },\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n      \"cantidad\": 2,\n      \"tipo_asignacion\": \"principal\"\n    }\n  ]\n}"
+              "raw": "{\n  \"emergencia_externa_id\": \"{{emergenciaPostmanId}}\",\n  \"nivel_gravedad\": \"MEDIA\",\n  \"aportes\": [\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-AGUA_POTABLE_ENVASADA\",\n      \"cantidad\": 100,\n      \"tipo_asignacion\": \"principal\"\n    },\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n      \"cantidad\": 2,\n      \"tipo_asignacion\": \"principal\"\n    }\n  ]\n}"
             }
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const idDinamico = 'emergencia-postman-' + Date.now();",
+                  "pm.collectionVariables.set('emergenciaPostmanId', idDinamico);"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -1578,7 +1588,7 @@
                   "pm.test(\"Compromiso registrado exitosamente\", () => {",
                   "  pm.expect([200, 201]).to.include(pm.response.code);",
                   "  const json = pm.response.json();",
-                  "  pm.expect(json.emergencia_externa_id).to.eql(\"emergencia-postman-01\");",
+                  "  pm.expect(json.emergencia_externa_id).to.eql(pm.collectionVariables.get(\"emergenciaPostmanId\"));",
                   "  pm.expect(json.compromisos.length).to.be.above(0);",
                   "  pm.expect(json.compromisos[0].estado).to.eql(\"COMPROMETIDO\");",
                   "});"
@@ -1586,6 +1596,167 @@
               }
             }
           ]
+        },
+        {
+          "name": "Validar restricciones (dry-run) - OK",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('valido es true', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.valido).to.be.true;",
+                  "    pm.expect(b.motivos).to.be.an('array').that.is.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenSistema}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emergencia_externa_id\": \"emergencia-postman-01\",\n  \"nivel_gravedad\": \"ALTA\",\n  \"aportes\": [\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n      \"cantidad\": 3,\n      \"tipo_asignacion\": \"principal\"\n    },\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-AGUA_POTABLE_ENVASADA\",\n      \"cantidad\": 99999,\n      \"tipo_asignacion\": \"apoyo\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/recursos/compromisos/validar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recursos",
+                "compromisos",
+                "validar"
+              ]
+            },
+            "description": "Dry-run: valida disponibilidad sin modificar inventario.\n\n- RSR-PARAMEDICOS (no consumible): stock=10, pide 3 → pasa.\n- RSR-AGUA_POTABLE_ENVASADA (consumible): cantidad irrelevante → pasa siempre.\n\nResultado esperado: valido=true, motivos=[]."
+          }
+        },
+        {
+          "name": "Validar restricciones (dry-run) - Stock insuficiente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('valido es false con motivo', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.valido).to.be.false;",
+                  "    pm.expect(b.motivos).to.have.lengthOf(1);",
+                  "    pm.expect(b.motivos[0].motivo).to.equal('stock_insuficiente');",
+                  "    pm.expect(b.motivos[0].codigo_recurso).to.equal('RSR-PARAMEDICOS');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenSistema}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emergencia_externa_id\": \"emergencia-postman-02\",\n  \"nivel_gravedad\": \"MEDIA\",\n  \"aportes\": [\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n      \"cantidad\": 999,\n      \"tipo_asignacion\": \"principal\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/recursos/compromisos/validar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recursos",
+                "compromisos",
+                "validar"
+              ]
+            },
+            "description": "Dry-run que falla: RSR-PARAMEDICOS es no consumible, stock=10, se piden 999.\n\nResultado esperado: valido=false, motivos con stock_insuficiente para RSR-PARAMEDICOS.\nEl inventario NO se modifica."
+          }
+        },
+        {
+          "name": "Validar restricciones (dry-run) - Consumible cantidad extrema (siempre OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('consumible ignora stock', () => {",
+                  "    const b = pm.response.json();",
+                  "    pm.expect(b.valido).to.be.true;",
+                  "    pm.expect(b.motivos).to.be.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenSistema}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"emergencia_externa_id\": \"emergencia-postman-03\",\n  \"nivel_gravedad\": \"CRITICA\",\n  \"aportes\": [\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-AGUA_POTABLE_ENVASADA\",\n      \"cantidad\": 9999999,\n      \"tipo_asignacion\": \"apoyo\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/recursos/compromisos/validar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recursos",
+                "compromisos",
+                "validar"
+              ]
+            },
+            "description": "RSR-AGUA_POTABLE_ENVASADA es consumible: sin importar la cantidad pedida, la validación pasa. Esto confirma que la API no gestiona inventario dinámico para consumibles."
+          }
         },
         {
           "name": "Reintento de compromiso (Idempotencia)",
@@ -1624,7 +1795,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"emergencia_externa_id\": \"emergencia-postman-01\",\n  \"nivel_gravedad\": \"MEDIA\",\n  \"aportes\": [\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-AGUA_POTABLE_ENVASADA\",\n      \"cantidad\": 100,\n      \"tipo_asignacion\": \"principal\"\n    },\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n      \"cantidad\": 2,\n      \"tipo_asignacion\": \"principal\"\n    }\n  ]\n}"
+              "raw": "{\n  \"emergencia_externa_id\": \"{{emergenciaPostmanId}}\",\n  \"nivel_gravedad\": \"MEDIA\",\n  \"aportes\": [\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-AGUA_POTABLE_ENVASADA\",\n      \"cantidad\": 100,\n      \"tipo_asignacion\": \"principal\"\n    },\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n      \"cantidad\": 2,\n      \"tipo_asignacion\": \"principal\"\n    }\n  ]\n}"
             }
           },
           "event": [
@@ -1653,14 +1824,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/recursos/compromisos/emergencia-postman-01/ongs/30-65432198-7/finalizacion",
+              "raw": "{{baseUrl}}/recursos/compromisos/{{emergenciaPostmanId}}/ongs/30-65432198-7/finalizacion",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "recursos",
                 "compromisos",
-                "emergencia-postman-01",
+                "{{emergenciaPostmanId}}",
                 "ongs",
                 "30-65432198-7",
                 "finalizacion"
@@ -1687,7 +1858,7 @@
                   "pm.test(\"Finalización y cierre exitoso con 200\", () => {",
                   "  pm.response.to.have.status(200);",
                   "  const json = pm.response.json();",
-                  "  pm.expect(json.emergencia_externa_id).to.eql(\"emergencia-postman-01\");",
+                  "  pm.expect(json.emergencia_externa_id).to.eql(pm.collectionVariables.get(\"emergenciaPostmanId\"));",
                   "  pm.expect(json.identificador_nacional).to.eql(\"30-65432198-7\");",
                   "  pm.expect(json.proyecto_cerrado).to.eql(true);",
                   "});"
@@ -1699,41 +1870,24 @@
         {
           "name": "Concurrencia",
           "request": {
-            "method": "POST",
+            "method": "GET",
             "header": [
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "X-Correlation-Id",
-                "value": "postman-corr-concurrencia"
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/recursos/compromisos",
+              "raw": "{{baseUrl}}/ongs/30-99999999-6/recursos/disponibilidad",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
+                "ongs",
+                "30-99999999-6",
                 "recursos",
-                "compromisos"
+                "disponibilidad"
               ]
-            },
-            "description": "Dispara dos pedidos en paralelo compitiendo por un mismo recurso (700 litros de agua cada uno cuando quedan menos de 1000). Valida que el locking transaccional evita sobreasignación: uno gana (201) y el otro es rechazado (422).",
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{tokenBonita}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"emergencia_externa_id\": \"emergencia-concurrente-A\",\n  \"nivel_gravedad\": \"MEDIA\",\n  \"aportes\": [\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-AGUA_POTABLE_ENVASADA\",\n      \"cantidad\": 700,\n      \"tipo_asignacion\": \"principal\"\n    }\n  ]\n}"
             }
           },
           "event": [
@@ -1742,8 +1896,21 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
+                  "pm.test(\"Consulta disponibilidad de Scouts Pergamino\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const b = pm.response.json();",
+                  "const items = b.elementos || b.items || [];",
+                  "const voluntarios = items.find(i => i.nombre === \"Voluntarios generales\") || { disponible: 40 };",
+                  "const disponible = voluntarios.disponible || 40;",
+                  "const cantidad = Math.floor(disponible / 2) + 1;",
+                  "",
                   "const baseUrl = pm.environment.get(\"baseUrl\") || \"http://localhost:8000\";",
                   "const token = pm.collectionVariables.get(\"tokenBonita\");",
+                  "const ts = Date.now();",
+                  "const emA = \"emergencia-concurrente-A-\" + ts;",
+                  "const emB = \"emergencia-concurrente-B-\" + ts;",
                   "",
                   "const pedido1 = {",
                   "  url: baseUrl + \"/recursos/compromisos\",",
@@ -1751,17 +1918,17 @@
                   "  header: {",
                   "    \"Content-Type\": \"application/json\",",
                   "    \"Authorization\": \"Bearer \" + token,",
-                  "    \"X-Correlation-Id\": \"concurrencia-A\"",
+                  "    \"X-Correlation-Id\": \"concurrencia-A-\" + ts",
                   "  },",
                   "  body: {",
                   "    mode: \"raw\",",
                   "    raw: JSON.stringify({",
-                  "      emergencia_externa_id: \"emergencia-concurrente-A\",",
+                  "      emergencia_externa_id: emA,",
                   "      nivel_gravedad: \"MEDIA\",",
                   "      aportes: [{",
-                  "        identificador_nacional: \"30-65432198-7\",",
-                  "        codigo_recurso: \"RSR-AGUA_POTABLE_ENVASADA\",",
-                  "        cantidad: 700,",
+                  "        identificador_nacional: \"30-99999999-6\",",
+                  "        codigo_recurso: \"RSR-VOLUNTARIOS_GENERALES\",",
+                  "        cantidad: cantidad,",
                   "        tipo_asignacion: \"principal\"",
                   "      }]",
                   "    })",
@@ -1774,17 +1941,17 @@
                   "  header: {",
                   "    \"Content-Type\": \"application/json\",",
                   "    \"Authorization\": \"Bearer \" + token,",
-                  "    \"X-Correlation-Id\": \"concurrencia-B\"",
+                  "    \"X-Correlation-Id\": \"concurrencia-B-\" + ts",
                   "  },",
                   "  body: {",
                   "    mode: \"raw\",",
                   "    raw: JSON.stringify({",
-                  "      emergencia_externa_id: \"emergencia-concurrente-B\",",
+                  "      emergencia_externa_id: emB,",
                   "      nivel_gravedad: \"MEDIA\",",
                   "      aportes: [{",
-                  "        identificador_nacional: \"30-65432198-7\",",
-                  "        codigo_recurso: \"RSR-AGUA_POTABLE_ENVASADA\",",
-                  "        cantidad: 700,",
+                  "        identificador_nacional: \"30-99999999-6\",",
+                  "        codigo_recurso: \"RSR-VOLUNTARIOS_GENERALES\",",
+                  "        cantidad: cantidad,",
                   "        tipo_asignacion: \"principal\"",
                   "      }]",
                   "    })",
@@ -1792,20 +1959,47 @@
                   "};",
                   "",
                   "Promise.all([",
-                  "  new Promise(resolve => pm.sendRequest(pedido1, (err, res) => resolve(res.code))),",
-                  "  new Promise(resolve => pm.sendRequest(pedido2, (err, res) => resolve(res.code)))",
-                  "]).then(codigos => {",
+                  "  new Promise(resolve => pm.sendRequest(pedido1, (err, res) => resolve({ id: emA, code: res.code }))),",
+                  "  new Promise(resolve => pm.sendRequest(pedido2, (err, res) => resolve({ id: emB, code: res.code })))",
+                  "]).then(resultados => {",
+                  "  const codigos = resultados.map(r => r.code);",
                   "  pm.test(\"Control de concurrencia: exactamente un pedido gana (201) y el otro es rechazado (422)\", () => {",
                   "    pm.expect(codigos).to.include(201);",
                   "    pm.expect(codigos).to.include(422);",
                   "  });",
+                  "",
+                  "  const ganador = resultados.find(r => r.code === 201);",
+                  "  if (ganador) {",
+                  "    const liberar = {",
+                  "      url: baseUrl + \"/recursos/compromisos/\" + ganador.id + \"/ongs/30-99999999-6/finalizacion\",",
+                  "      method: \"POST\",",
+                  "      header: {",
+                  "        \"Authorization\": \"Bearer \" + token",
+                  "      }",
+                  "    };",
+                  "    pm.sendRequest(liberar, (err, res) => {",
+                  "      pm.test(\"Recurso no consumible liberado tras prueba de concurrencia\", () => {",
+                  "        pm.expect([200, 204]).to.include(res.code);",
+                  "      });",
+                  "    });",
+                  "  }",
                   "});"
                 ]
               }
             }
           ]
         }
-      ]
+      ],
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{tokenBonita}}",
+            "type": "string"
+          }
+        ]
+      }
     },
     {
       "name": "7. Evaluación de ofertas",
@@ -2070,6 +2264,10 @@
     {
       "key": "certificacionId",
       "value": "1"
+    },
+    {
+      "key": "emergenciaPostmanId",
+      "value": ""
     }
   ]
 }

@@ -11,6 +11,7 @@ from app.modulos.compromisos.schemas import (
     PeticionCompromiso,
     RespuestaCompromiso,
     RespuestaFinalizacion,
+    RespuestaValidacion,
 )
 from app.modulos.compromisos.servicios import AporteSolicitado
 
@@ -22,15 +23,21 @@ blueprint_compromisos = Blueprint(
 )
 
 EJEMPLO_COMPROMISO = {
-    "emergencia_externa_id": "emergencia-2026-0042",
+    "emergencia_externa_id": "emergencia-demo-01",
     "nivel_gravedad": "MEDIA",
     "aportes": [
         {
-            "identificador_nacional": "30-11111111-1",
-            "codigo_recurso": "RSR-AGUA_POTABLE",
-            "cantidad": 500,
+            "identificador_nacional": "30-65432198-7",
+            "codigo_recurso": "RSR-PARAMEDICOS",
+            "cantidad": 2,
             "tipo_asignacion": "principal",
-        }
+        },
+        {
+            "identificador_nacional": "30-65432198-7",
+            "codigo_recurso": "RSR-AGUA_POTABLE_ENVASADA",
+            "cantidad": 100,
+            "tipo_asignacion": "principal",
+        },
     ],
 }
 
@@ -111,6 +118,83 @@ class CompromisoDeRecursos(MethodView):
             ],
         }
         return cuerpo, 200 if resultado.repetido else 201
+
+
+EJEMPLO_VALIDACION = {
+    "emergencia_externa_id": "emergencia-demo-01",
+    "nivel_gravedad": "MEDIA",
+    "aportes": [
+        {
+            "identificador_nacional": "30-65432198-7",
+            "codigo_recurso": "RSR-PARAMEDICOS",
+            "cantidad": 2,
+            "tipo_asignacion": "principal",
+        },
+        {
+            "identificador_nacional": "30-65432198-7",
+            "codigo_recurso": "RSR-AGUA_POTABLE_ENVASADA",
+            "cantidad": 100,
+            "tipo_asignacion": "principal",
+        },
+    ],
+}
+
+
+@blueprint_compromisos.route("/validar")
+class ValidacionDeRestricciones(MethodView):
+    @blueprint_compromisos.requiere_rol(Rol.sistema)
+    @blueprint_compromisos.arguments(PeticionCompromiso, example=EJEMPLO_VALIDACION)
+    @blueprint_compromisos.response(
+        200,
+        RespuestaValidacion,
+        description=(
+            "Resultado de la validaci\u00f3n sin efecto colateral. "
+            "`valido: true` indica que el compromiso puede ejecutarse; "
+            "`valido: false` incluye los motivos de fallo."
+        ),
+    )
+    @blueprint_compromisos.alt_response(
+        400,
+        schema=RespuestaError,
+        description="El JSON est\u00e1 incompleto o contiene campos inv\u00e1lidos.",
+    )
+    @blueprint_compromisos.alt_response(
+        404,
+        schema=RespuestaError,
+        description="No existe una organizaci\u00f3n o un c\u00f3digo de recurso indicado.",
+    )
+    def post(self, datos):
+        """Verificar si los aportes pueden comprometerse sin modificar el inventario.
+
+        Solo valida disponibilidad en \u00edtems no consumibles. Los consumibles se aprueban
+        sin verificaci\u00f3n de stock.
+        """
+        resultado = servicios.validar_restricciones(
+            emergencia_externa_id=datos["emergencia_externa_id"],
+            nivel_gravedad=datos["nivel_gravedad"],
+            aportes=[
+                AporteSolicitado(
+                    identificador_nacional=aporte["identificador_nacional"],
+                    codigo_recurso=aporte["codigo_recurso"],
+                    cantidad=aporte["cantidad"],
+                    tipo_asignacion=aporte["tipo_asignacion"],
+                )
+                for aporte in datos["aportes"]
+            ],
+        )
+        return {
+            "valido": resultado.valido,
+            "motivos": [
+                {
+                    "identificador_nacional": m.identificador_nacional,
+                    "codigo_recurso": m.codigo_recurso,
+                    "cantidad_solicitada": m.cantidad_solicitada,
+                    "cantidad_disponible": m.cantidad_disponible,
+                    "motivo": m.motivo,
+                }
+                for m in resultado.motivos
+            ],
+        }
 
 
 @blueprint_compromisos.route(
