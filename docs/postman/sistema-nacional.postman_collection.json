@@ -583,6 +583,12 @@
                   "  pm.expect(cuerpo.por_pagina).to.eql(20);",
                   "  pm.expect(cuerpo.elementos).to.be.an(\"array\");",
                   "  pm.expect(cuerpo.total).to.be.a(\"number\");",
+                  "});",
+                  "pm.test(\"Guarda el ID de una certificación del catálogo\", () => {",
+                  "  const certificaciones = pm.response.json().elementos;",
+                  "  if (certificaciones.length > 0) {",
+                  "    pm.collectionVariables.set(\"certificacionId\", certificaciones[0].id);",
+                  "  }",
                   "});"
                 ]
               }
@@ -679,7 +685,7 @@
                 }
               ]
             },
-            "description": "Consulta la disponibilidad de recursos de tipo agua, descontando compromisos activos.",
+            "description": "Consulta el total histórico, los compromisos activos y la disponibilidad actual de recursos de tipo agua.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -712,6 +718,12 @@
                   "    pm.expect(recurso.disponible).to.be.a(\"number\");",
                   "    pm.expect(recurso.disponible).to.be.at.least(0);",
                   "  });",
+                  "});",
+                  "pm.test(\"Guarda el ID de un ítem del catálogo\", () => {",
+                  "  const items = pm.response.json().elementos;",
+                  "  if (items.length > 0) {",
+                  "    pm.collectionVariables.set(\"itemId\", items[0].id);",
+                  "  }",
                   "});"
                 ]
               }
@@ -737,7 +749,7 @@
               "query": [
                 {
                   "key": "pagina",
-                  "value": "1"
+                  "value": ""
                 },
                 {
                   "key": "por_pagina",
@@ -774,186 +786,6 @@
                   "    pm.expect(recurso.consumible).to.be.a(\"boolean\");",
                   "    pm.expect(recurso.disponible).to.be.at.least(0);",
                   "  });",
-                  "});"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "4. Gestión de organizaciones",
-      "description": "Carga de inventario y certificaciones de una organizaci?n. Requiere el rol administrador.",
-      "item": [
-        {
-          "name": "Cargar ítem al inventario",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/ongs/{{cuitNueva}}/inventario",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "ongs",
-                "{{cuitNueva}}",
-                "inventario"
-              ]
-            },
-            "description": "Carga un ítem y su cantidad disponible. Ajustar itemId si la semilla usa otro identificador.",
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{tokenAdmin}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"item_id\": {{itemId}},\n  \"cantidad_disponible\": 100\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Responde 201 con el ítem cargado\", () => {",
-                  "  pm.response.to.have.status(201);",
-                  "  const cuerpo = pm.response.json();",
-                  "  pm.expect(cuerpo.item_id).to.eql(Number(pm.collectionVariables.get(\"itemId\")));",
-                  "  pm.expect(cuerpo.cantidad_disponible).to.eql(100);",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Cargar certificación y nivel",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/ongs/{{cuitNueva}}/certificaciones",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "ongs",
-                "{{cuitNueva}}",
-                "certificaciones"
-              ]
-            },
-            "description": "Asigna una certificación a la ONG nueva con el nivel informado.",
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{tokenAdmin}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"certificacion_id\": {{certificacionId}},\n  \"nivel_certificacion\": \"alta\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Responde 201 con la certificación cargada\", () => {",
-                  "  pm.response.to.have.status(201);",
-                  "  const cuerpo = pm.response.json();",
-                  "  pm.expect(cuerpo.certificacion_id).to.eql(Number(pm.collectionVariables.get(\"certificacionId\")));",
-                  "  pm.expect(cuerpo.nivel_certificacion).to.eql(\"alta\");",
-                  "});"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Nivel de certificación inválido",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/ongs/{{cuitNueva}}/certificaciones",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "ongs",
-                "{{cuitNueva}}",
-                "certificaciones"
-              ]
-            },
-            "description": "El nivel solo acepta baja, media, alta o crítica. Los valores históricos como ALTO se rechazan.",
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{tokenAdmin}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"certificacion_id\": {{certificacionId}},\n  \"nivel_certificacion\": \"ALTO\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Responde 400 por nivel inválido\", () => {",
-                  "  pm.response.to.have.status(400);",
                   "});"
                 ]
               }
@@ -1517,6 +1349,186 @@
                   "  const registros = pm.response.json().registros;",
                   "  pm.expect(registros.length).to.be.above(2);",
                   "  pm.expect(registros[registros.length - 1].estado_nuevo).to.eql(\"suspendida\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Gestión de organizaciones",
+      "description": "Carga de inventario y certificaciones de una organización. Requiere el rol administrador.",
+      "item": [
+        {
+          "name": "Cargar ítem al inventario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ongs/{{cuitNueva}}/inventario",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs",
+                "{{cuitNueva}}",
+                "inventario"
+              ]
+            },
+            "description": "Carga el primer ítem devuelto por el catálogo de disponibilidad.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"item_id\": {{itemId}},\n  \"cantidad_disponible\": 100\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201 con el ítem cargado\", () => {",
+                  "  pm.response.to.have.status(201);",
+                  "  const cuerpo = pm.response.json();",
+                  "  pm.expect(cuerpo.item_id).to.eql(Number(pm.collectionVariables.get(\"itemId\")));",
+                  "  pm.expect(cuerpo.cantidad_disponible).to.eql(100);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cargar certificación y nivel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ongs/{{cuitNueva}}/certificaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs",
+                "{{cuitNueva}}",
+                "certificaciones"
+              ]
+            },
+            "description": "Asigna una certificación a la ONG nueva con el nivel informado.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"certificacion_id\": {{certificacionId}},\n  \"nivel_certificacion\": \"alta\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 201 con la certificación cargada\", () => {",
+                  "  pm.response.to.have.status(201);",
+                  "  const cuerpo = pm.response.json();",
+                  "  pm.expect(cuerpo.certificacion_id).to.eql(Number(pm.collectionVariables.get(\"certificacionId\")));",
+                  "  pm.expect(cuerpo.nivel_certificacion).to.eql(\"alta\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Nivel de certificación inválido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ongs/{{cuitNueva}}/certificaciones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ongs",
+                "{{cuitNueva}}",
+                "certificaciones"
+              ]
+            },
+            "description": "El nivel solo acepta baja, media, alta o crítica. Los valores históricos como ALTO se rechazan.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"certificacion_id\": {{certificacionId}},\n  \"nivel_certificacion\": \"ALTO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 400 por nivel inválido\", () => {",
+                  "  pm.response.to.have.status(400);",
                   "});"
                 ]
               }
@@ -2181,7 +2193,7 @@
           ]
         },
         {
-          "name": "Caso rechazo por falta de certificaci?n",
+          "name": "Caso rechazo por falta de certificación",
           "request": {
             "method": "POST",
             "header": [
@@ -2226,11 +2238,11 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Rechaza por falta de certificaci?n\", () => {",
+                  "pm.test(\"Rechaza por falta de certificación\", () => {",
                   "  pm.response.to.have.status(200);",
                   "  const aporte = pm.response.json().ofertas[0].items[0].aportes[0];",
                   "  pm.expect(aporte.clasificacion).to.eql(\"rechazada\");",
-                  "  pm.expect(aporte.motivo).to.include(\"No existe certificaci?n\");",
+                  "  pm.expect(aporte.motivo).to.include(\"No existe certificación\");",
                   "});"
                 ]
               }
@@ -2259,11 +2271,11 @@
     },
     {
       "key": "itemId",
-      "value": "1"
+      "value": ""
     },
     {
       "key": "certificacionId",
-      "value": "1"
+      "value": ""
     },
     {
       "key": "emergenciaPostmanId",

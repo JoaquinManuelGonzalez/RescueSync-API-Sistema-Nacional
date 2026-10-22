@@ -7,6 +7,10 @@ from flask.views import MethodView
 from app.core.acceso import Blueprint, Rol
 from app.core.errores import RespuestaError
 from app.modulos.evaluacion import servicios
+from app.modulos.evaluacion.ejemplos import (
+    EJEMPLO_EVALUACION_PRINCIPAL_Y_APOYO,
+    EJEMPLOS_RESPUESTA_EVALUACION,
+)
 from app.modulos.evaluacion.schemas import EvaluacionOfertasSchema, RespuestaEvaluacionSchema
 
 blueprint_evaluacion = Blueprint(
@@ -20,8 +24,15 @@ blueprint_evaluacion = Blueprint(
 @blueprint_evaluacion.route("/evaluacion")
 class EvaluacionDeOfertas(MethodView):
     @blueprint_evaluacion.requiere_rol(Rol.sistema)
-    @blueprint_evaluacion.arguments(EvaluacionOfertasSchema)
-    @blueprint_evaluacion.response(200, RespuestaEvaluacionSchema)
+    @blueprint_evaluacion.arguments(
+        EvaluacionOfertasSchema,
+        example=EJEMPLO_EVALUACION_PRINCIPAL_Y_APOYO,
+    )
+    @blueprint_evaluacion.response(
+        200,
+        RespuestaEvaluacionSchema,
+        examples=EJEMPLOS_RESPUESTA_EVALUACION,
+    )
     @blueprint_evaluacion.alt_response(400, schema=RespuestaError)
     @blueprint_evaluacion.alt_response(404, schema=RespuestaError)
     @blueprint_evaluacion.alt_response(422, schema=RespuestaError)
