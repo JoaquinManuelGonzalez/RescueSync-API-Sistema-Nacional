@@ -100,9 +100,7 @@ def test_consulta_ongs_filtra_por_certificacion_y_nivel(base_de_datos, cliente, 
     ]
 
 
-def test_disponibilidad_expone_inventario_y_compromisos_activos(
-    base_de_datos, cliente, cabeceras
-):
+def test_disponibilidad_expone_inventario_y_compromisos_activos(base_de_datos, cliente, cabeceras):
     organizacion = Organizacion(
         tipo=TipoOrganizacion.ong,
         nombre="ONG de recursos",

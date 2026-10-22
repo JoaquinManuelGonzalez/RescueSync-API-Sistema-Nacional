@@ -63,9 +63,7 @@ EJEMPLO_RESPUESTA_PRINCIPAL_Y_APOYO = {
         {
             "fecha_creacion": "2026-10-16T14:40:44+00:00",
             "oferta_id": 7,
-            "organizaciones": EJEMPLO_EVALUACION_PRINCIPAL_Y_APOYO["ofertas"][0][
-                "organizaciones"
-            ],
+            "organizaciones": EJEMPLO_EVALUACION_PRINCIPAL_Y_APOYO["ofertas"][0]["organizaciones"],
             "items": [
                 {
                     "aportes": [

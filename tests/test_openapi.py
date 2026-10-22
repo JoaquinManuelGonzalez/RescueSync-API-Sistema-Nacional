@@ -68,9 +68,12 @@ def test_documenta_evaluacion_de_ofertas(especificacion):
         "rechazo_stock_insuficiente",
         "rechazo_sin_certificacion",
     }
-    assert respuestas["ok_principal_y_apoyo"]["value"]["ofertas"][0]["items"][0][
-        "aportes"
-    ][0]["clasificacion"] == "principal"
+    assert (
+        respuestas["ok_principal_y_apoyo"]["value"]["ofertas"][0]["items"][0]["aportes"][0][
+            "clasificacion"
+        ]
+        == "principal"
+    )
     assert "200" in operacion["responses"]
     assert "401" in operacion["responses"]
     assert "403" in operacion["responses"]

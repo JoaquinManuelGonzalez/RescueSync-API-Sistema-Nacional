@@ -222,9 +222,7 @@ class DisponibilidadGlobal(MethodView):
                     + func.coalesce(comprometido_subconsulta.c.comprometido, 0)
                 ).label("total"),
                 total_subconsulta.c.total.label("disponible"),
-                func.coalesce(comprometido_subconsulta.c.comprometido, 0).label(
-                    "comprometido"
-                ),
+                func.coalesce(comprometido_subconsulta.c.comprometido, 0).label("comprometido"),
             )
             .join(total_subconsulta, total_subconsulta.c.item_id == Item.id)
             .outerjoin(
@@ -330,9 +328,7 @@ class DisponibilidadDeOrganizacion(MethodView):
                     + func.coalesce(comprometido_subconsulta.c.comprometido, 0)
                 ).label("total"),
                 total_subconsulta.c.total.label("disponible"),
-                func.coalesce(comprometido_subconsulta.c.comprometido, 0).label(
-                    "comprometido"
-                ),
+                func.coalesce(comprometido_subconsulta.c.comprometido, 0).label("comprometido"),
             )
             .join(total_subconsulta, total_subconsulta.c.item_id == Item.id)
             .outerjoin(
