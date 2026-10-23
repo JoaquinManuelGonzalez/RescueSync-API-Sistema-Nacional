@@ -112,7 +112,7 @@ class OrganizacionesHabilitadas(MethodView):
         200,
         OrganizacionesPaginadasSchema,
         example=EJEMPLO_ONGS_HABILITADAS,
-        description="Muestra todas las ONGs (con filtro por `nivel_certificacion == alto`).",
+        description="Muestra todas las ONGs (con filtro por `nivel_certificacion == alta`).",
     )
     @blueprint_organizaciones.alt_response(
         400,
@@ -367,7 +367,9 @@ class DisponibilidadDeOrganizacion(MethodView):
 @blueprint_organizaciones.route("/ongs/<string:cuit>/inventario")
 class CargaDeInventario(MethodView):
     @blueprint_organizaciones.requiere_rol(Rol.administrador)
-    @blueprint_organizaciones.arguments(PeticionCargaInventarioSchema)
+    @blueprint_organizaciones.arguments(
+        PeticionCargaInventarioSchema, example={"item_id": 30, "cantidad_disponible": 5}
+    )
     @blueprint_organizaciones.response(
         201,
         InventarioCargadoSchema,
@@ -406,7 +408,10 @@ class CargaDeInventario(MethodView):
 @blueprint_organizaciones.route("/ongs/<string:cuit>/certificaciones")
 class CargaDeCertificacion(MethodView):
     @blueprint_organizaciones.requiere_rol(Rol.administrador)
-    @blueprint_organizaciones.arguments(PeticionCargaCertificacionSchema)
+    @blueprint_organizaciones.arguments(
+        PeticionCargaCertificacionSchema,
+        example={"certificacion_id": 6, "nivel_certificacion": "alta"},
+    )
     @blueprint_organizaciones.response(
         201,
         CertificacionCargadaSchema,

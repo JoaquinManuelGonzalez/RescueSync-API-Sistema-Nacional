@@ -98,7 +98,7 @@ EJEMPLO_RESPUESTA_PRINCIPAL_Y_APOYO = {
                                 "La certificación tiene un nivel menor al requerido; "
                                 "se asigna como apoyo."
                             ),
-                            "compromiso_registrado": True,
+                            "compromiso_registrado": False,
                         }
                     ],
                     "cantidad_total": 2,
