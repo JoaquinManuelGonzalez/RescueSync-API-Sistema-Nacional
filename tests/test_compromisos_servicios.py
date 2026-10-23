@@ -14,6 +14,7 @@ from app.modulos.compromisos.servicios import (
     validar_restricciones,
 )
 from app.modulos.organizaciones.modelos import (
+    EstadoHabilitacion,
     Inventario,
     InventarioItem,
     Item,
@@ -52,6 +53,7 @@ def base_de_datos(app):
                 nombre=f"ONG {numero}",
                 mail_contacto=f"ong{numero}@example.test",
                 identificador_nacional=identificador,
+                estado_habilitacion=EstadoHabilitacion.habilitada,
                 inventario=inventario,
             )
             organizaciones.append(organizacion)
@@ -423,13 +425,20 @@ def test_validar_restricciones_consumible_ignora_stock(base_de_datos):
         consumible=True,
     )
     db.session.add(item_consumible)
+    org = db.session.query(Organizacion).filter_by(identificador_nacional="30-11111111-1").one()
+    org.inventario.items.append(
+        InventarioItem(
+            item=item_consumible,
+            cantidad_disponible=0,
+        )
+    )
     db.session.commit()
 
     aportes = [
         AporteSolicitado(
             identificador_nacional="30-11111111-1",
             codigo_recurso="RSR-AGUA",
-            cantidad=999999,  # Sin stock declarado en la ONG
+            cantidad=999999,  # Consumible no requiere stock disponible
             tipo_asignacion=TipoAsignacion.principal,
         )
     ]
@@ -441,3 +450,117 @@ def test_validar_restricciones_consumible_ignora_stock(base_de_datos):
 
     assert resultado.valido is True
     assert resultado.motivos == ()
+
+
+def test_validar_restricciones_organizacion_no_habilitada(base_de_datos):
+    org = db.session.query(Organizacion).filter_by(identificador_nacional="30-11111111-1").one()
+    org.estado_habilitacion = EstadoHabilitacion.suspendida
+    db.session.commit()
+
+    resultado = validar_restricciones(
+        emergencia_externa_id="13",
+        nivel_gravedad="MEDIA",
+        aportes=aportes_validos(),
+    )
+
+    assert resultado.valido is False
+    assert any(m.motivo == "organizacion_no_habilitada" for m in resultado.motivos)
+
+
+def test_validar_restricciones_recurso_no_declarado(base_de_datos):
+    item_no_declarado = Item(
+        codigo_recurso="RSR-FRAZADAS",
+        nombre="Frazadas",
+        tipo=TipoItem.abrigo,
+        unidad_medida="unidades",
+        consumible=True,
+    )
+    db.session.add(item_no_declarado)
+    db.session.commit()
+
+    aportes = [
+        AporteSolicitado(
+            identificador_nacional="30-11111111-1",
+            codigo_recurso="RSR-FRAZADAS",
+            cantidad=10,
+            tipo_asignacion=TipoAsignacion.principal,
+        )
+    ]
+    resultado = validar_restricciones(
+        emergencia_externa_id="13",
+        nivel_gravedad="MEDIA",
+        aportes=aportes,
+    )
+
+    assert resultado.valido is False
+    assert any(m.motivo == "recurso_no_declarado" for m in resultado.motivos)
+
+
+def test_comprometer_recursos_organizacion_no_habilitada_falla(base_de_datos):
+    from app.core.errores import ReglaDeNegocioIncumplida
+
+    org = db.session.query(Organizacion).filter_by(identificador_nacional="30-11111111-1").one()
+    org.estado_habilitacion = EstadoHabilitacion.suspendida
+    db.session.commit()
+
+    with pytest.raises(ReglaDeNegocioIncumplida) as exc:
+        comprometer_recursos(
+            emergencia_externa_id="13",
+            nivel_gravedad="MEDIA",
+            aportes=aportes_validos(),
+        )
+    assert "no está habilitada" in str(exc.value)
+    assert exc.value.detalle == {"identificadores_nacionales": ["30-11111111-1"]}
+
+
+def test_comprometer_recursos_recurso_no_declarado_falla(base_de_datos):
+    from app.core.errores import ReglaDeNegocioIncumplida
+
+    item_no_declarado = Item(
+        codigo_recurso="RSR-FRAZADAS",
+        nombre="Frazadas",
+        tipo=TipoItem.abrigo,
+        unidad_medida="unidades",
+        consumible=True,
+    )
+    db.session.add(item_no_declarado)
+    db.session.commit()
+
+    aportes = [
+        AporteSolicitado(
+            identificador_nacional="30-11111111-1",
+            codigo_recurso="RSR-FRAZADAS",
+            cantidad=10,
+            tipo_asignacion=TipoAsignacion.principal,
+        )
+    ]
+    with pytest.raises(ReglaDeNegocioIncumplida) as exc:
+        comprometer_recursos(
+            emergencia_externa_id="13",
+            nivel_gravedad="MEDIA",
+            aportes=aportes,
+        )
+    assert "no declaró este recurso" in str(exc.value)
+
+
+def test_reintento_despues_de_suspension_sigue_siendo_exitoso(base_de_datos):
+    resultado1 = comprometer_recursos(
+        emergencia_externa_id="13",
+        nivel_gravedad="MEDIA",
+        aportes=aportes_validos(),
+    )
+    assert resultado1.repetido is False
+
+    # Suspender la ONG después de haber comprometido
+    org = db.session.query(Organizacion).filter_by(identificador_nacional="30-11111111-1").one()
+    org.estado_habilitacion = EstadoHabilitacion.suspendida
+    db.session.commit()
+
+    # Reintento idéntico debe seguir respondiendo repetido=True sin error
+    resultado2 = comprometer_recursos(
+        emergencia_externa_id="13",
+        nivel_gravedad="MEDIA",
+        aportes=aportes_validos(),
+    )
+    assert resultado2.repetido is True
+

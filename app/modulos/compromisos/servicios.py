@@ -18,7 +18,13 @@ from app.modulos.compromisos.modelos import (
     NivelGravedad,
     TipoAsignacion,
 )
-from app.modulos.organizaciones.modelos import Inventario, InventarioItem, Item, Organizacion
+from app.modulos.organizaciones.modelos import (
+    EstadoHabilitacion,
+    Inventario,
+    InventarioItem,
+    Item,
+    Organizacion,
+)
 
 
 class DisponibilidadInsuficiente(ReglaDeNegocioIncumplida):
@@ -286,15 +292,45 @@ def validar_restricciones(
     }
 
     motivos: list[MotivoFallo] = []
+
+    # Rechazar organizaciones que no estén habilitadas.
+    no_habilitadas = [
+        org.identificador_nacional
+        for org in organizaciones
+        if org.estado_habilitacion is not EstadoHabilitacion.habilitada
+    ]
+    for cuit in no_habilitadas:
+        motivos.append(
+            MotivoFallo(
+                identificador_nacional=cuit,
+                codigo_recurso="",
+                cantidad_solicitada=0,
+                cantidad_disponible=0,
+                motivo="organizacion_no_habilitada",
+            )
+        )
+
     for aporte in solicitud:
         item = items_por_codigo[aporte.codigo_recurso]
-        # Los consumibles no tienen stock declarado: siempre pasan la validación.
-        if item.consumible:
-            continue
         inventario_item = inventario_por_clave.get(
             (aporte.identificador_nacional, aporte.codigo_recurso)
         )
-        disponible = inventario_item.cantidad_disponible if inventario_item else 0
+        # Rechazar si la ONG no declaró este recurso en su inventario.
+        if inventario_item is None:
+            motivos.append(
+                MotivoFallo(
+                    identificador_nacional=aporte.identificador_nacional,
+                    codigo_recurso=aporte.codigo_recurso,
+                    cantidad_solicitada=aporte.cantidad,
+                    cantidad_disponible=0,
+                    motivo="recurso_no_declarado",
+                )
+            )
+            continue
+        # Los consumibles no requieren verificación de stock.
+        if item.consumible:
+            continue
+        disponible = inventario_item.cantidad_disponible
         if disponible < aporte.cantidad:
             motivos.append(
                 MotivoFallo(
@@ -392,15 +428,36 @@ def comprometer_recursos(
         ):
             return ResultadoCompromiso(tuple(compromisos_existentes), repetido=True)
 
+        # Rechazar organizaciones que no estén habilitadas.
+        no_habilitadas = [
+            org.identificador_nacional
+            for org in organizaciones
+            if org.estado_habilitacion is not EstadoHabilitacion.habilitada
+        ]
+        if no_habilitadas:
+            raise ReglaDeNegocioIncumplida(
+                "La organización no está habilitada para comprometer recursos.",
+                detalle={"identificadores_nacionales": sorted(no_habilitadas)},
+            )
+
         for aporte in solicitud:
             item = items_por_codigo[aporte.codigo_recurso]
-            # Los consumibles no tienen stock declarado ni se verifica disponibilidad.
-            if item.consumible:
-                continue
             inventario_item = inventario_por_clave.get(
                 (aporte.identificador_nacional, aporte.codigo_recurso)
             )
-            disponible = inventario_item.cantidad_disponible if inventario_item else 0
+            # Rechazar si la ONG no declaró este recurso en su inventario.
+            if inventario_item is None:
+                raise ReglaDeNegocioIncumplida(
+                    "La organización no declaró este recurso en su inventario.",
+                    detalle={
+                        "identificador_nacional": aporte.identificador_nacional,
+                        "codigo_recurso": aporte.codigo_recurso,
+                    },
+                )
+            # Los consumibles no requieren verificación de stock.
+            if item.consumible:
+                continue
+            disponible = inventario_item.cantidad_disponible
             if disponible < aporte.cantidad:
                 raise DisponibilidadInsuficiente(
                     "La cantidad solicitada supera la disponibilidad.",
@@ -424,9 +481,9 @@ def comprometer_recursos(
 
         for aporte in solicitud:
             item = items_por_codigo[aporte.codigo_recurso]
-            inventario_item = inventario_por_clave.get(
+            inventario_item = inventario_por_clave[
                 (aporte.identificador_nacional, aporte.codigo_recurso)
-            )
+            ]
             # Solo los no consumibles tienen stock declarado; se descuenta su disponibilidad.
             if not item.consumible:
                 inventario_item.cantidad_disponible -= aporte.cantidad

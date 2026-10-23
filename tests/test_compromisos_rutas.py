@@ -285,3 +285,127 @@ def test_validar_recursos_requiere_rol_sistema(cliente, cabeceras):
     )
 
     assert respuesta.status_code == 403
+
+
+def test_post_compromisos_ong_no_habilitada_responde_422(
+    cliente,
+    cabeceras,
+    inventario_disponible,
+):
+    inventario_disponible.estado_habilitacion = EstadoHabilitacion.suspendida
+    db.session.commit()
+
+    respuesta = cliente.post(
+        "/recursos/compromisos",
+        json=PETICION,
+        headers=cabeceras(Rol.sistema),
+    )
+
+    assert respuesta.status_code == 422
+    datos = respuesta.get_json()
+    assert datos["error"]["codigo"] == "REGLA_DE_NEGOCIO_INCUMPLIDA"
+    assert datos["error"]["detalle"] == {
+        "identificadores_nacionales": ["30-11111111-1"]
+    }
+
+
+def test_post_compromisos_recurso_no_declarado_responde_422(
+    cliente,
+    cabeceras,
+    inventario_disponible,
+):
+    item = Item(
+        codigo_recurso="RSR-FRAZADAS",
+        nombre="Frazadas",
+        tipo=TipoItem.abrigo,
+        unidad_medida="unidades",
+        consumible=True,
+    )
+    db.session.add(item)
+    db.session.commit()
+
+    peticion = {
+        **PETICION,
+        "aportes": [
+            {
+                "identificador_nacional": "30-11111111-1",
+                "codigo_recurso": "RSR-FRAZADAS",
+                "cantidad": 5,
+                "tipo_asignacion": "principal",
+            }
+        ],
+    }
+
+    respuesta = cliente.post(
+        "/recursos/compromisos",
+        json=peticion,
+        headers=cabeceras(Rol.sistema),
+    )
+
+    assert respuesta.status_code == 422
+    datos = respuesta.get_json()
+    assert datos["error"]["codigo"] == "REGLA_DE_NEGOCIO_INCUMPLIDA"
+    assert datos["error"]["detalle"] == {
+        "identificador_nacional": "30-11111111-1",
+        "codigo_recurso": "RSR-FRAZADAS",
+    }
+
+
+def test_validar_recursos_ong_no_habilitada_responde_valido_false(
+    cliente,
+    cabeceras,
+    inventario_disponible,
+):
+    inventario_disponible.estado_habilitacion = EstadoHabilitacion.suspendida
+    db.session.commit()
+
+    respuesta = cliente.post(
+        "/recursos/compromisos/validar",
+        json=PETICION,
+        headers=cabeceras(Rol.sistema),
+    )
+
+    assert respuesta.status_code == 200
+    datos = respuesta.get_json()
+    assert datos["valido"] is False
+    assert any(m["motivo"] == "organizacion_no_habilitada" for m in datos["motivos"])
+
+
+def test_validar_recursos_recurso_no_declarado_responde_valido_false(
+    cliente,
+    cabeceras,
+    inventario_disponible,
+):
+    item = Item(
+        codigo_recurso="RSR-FRAZADAS",
+        nombre="Frazadas",
+        tipo=TipoItem.abrigo,
+        unidad_medida="unidades",
+        consumible=True,
+    )
+    db.session.add(item)
+    db.session.commit()
+
+    peticion = {
+        **PETICION,
+        "aportes": [
+            {
+                "identificador_nacional": "30-11111111-1",
+                "codigo_recurso": "RSR-FRAZADAS",
+                "cantidad": 5,
+                "tipo_asignacion": "principal",
+            }
+        ],
+    }
+
+    respuesta = cliente.post(
+        "/recursos/compromisos/validar",
+        json=peticion,
+        headers=cabeceras(Rol.sistema),
+    )
+
+    assert respuesta.status_code == 200
+    datos = respuesta.get_json()
+    assert datos["valido"] is False
+    assert any(m["motivo"] == "recurso_no_declarado" for m in datos["motivos"])
+
