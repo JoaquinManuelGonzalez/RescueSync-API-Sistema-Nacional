@@ -563,4 +563,3 @@ def test_reintento_despues_de_suspension_sigue_siendo_exitoso(base_de_datos):
         aportes=aportes_validos(),
     )
     assert resultado2.repetido is True
-

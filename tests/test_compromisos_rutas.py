@@ -304,9 +304,7 @@ def test_post_compromisos_ong_no_habilitada_responde_422(
     assert respuesta.status_code == 422
     datos = respuesta.get_json()
     assert datos["error"]["codigo"] == "REGLA_DE_NEGOCIO_INCUMPLIDA"
-    assert datos["error"]["detalle"] == {
-        "identificadores_nacionales": ["30-11111111-1"]
-    }
+    assert datos["error"]["detalle"] == {"identificadores_nacionales": ["30-11111111-1"]}
 
 
 def test_post_compromisos_recurso_no_declarado_responde_422(
@@ -408,4 +406,3 @@ def test_validar_recursos_recurso_no_declarado_responde_valido_false(
     datos = respuesta.get_json()
     assert datos["valido"] is False
     assert any(m["motivo"] == "recurso_no_declarado" for m in datos["motivos"])
-
