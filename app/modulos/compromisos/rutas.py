@@ -11,6 +11,7 @@ from app.modulos.compromisos.schemas import (
     PeticionCompromiso,
     RespuestaCompromiso,
     RespuestaFinalizacion,
+    RespuestaLiberacion,
     RespuestaValidacion,
 )
 from app.modulos.compromisos.servicios import AporteSolicitado
@@ -120,6 +121,103 @@ class CompromisoDeRecursos(MethodView):
         return cuerpo, 200 if resultado.repetido else 201
 
 
+@blueprint_compromisos.route("/<string:emergencia_externa_id>/liberacion")
+class LiberacionDeRecursos(MethodView):
+    @blueprint_compromisos.requiere_rol(Rol.sistema)
+    @blueprint_compromisos.response(
+        200,
+        RespuestaLiberacion,
+        description=(
+            "Libera todos los compromisos de una emergencia; repetir la solicitud no "
+            "reintegra inventario nuevamente."
+        ),
+    )
+    @blueprint_compromisos.alt_response(
+        404,
+        schema=RespuestaError,
+        description="No hay compromisos registrados para la emergencia indicada.",
+    )
+    @blueprint_compromisos.alt_response(
+        409,
+        schema=RespuestaError,
+        description="El estado actual de los compromisos impide liberarlos.",
+    )
+    def post(self, emergencia_externa_id: str):
+        """Liberar los recursos comprometidos cuando se reinicia una convocatoria."""
+        resultado = servicios.liberar_recursos(emergencia_externa_id=emergencia_externa_id)
+        return {
+            "emergencia_externa_id": emergencia_externa_id.strip(),
+            "repetido": resultado.repetido,
+            "compromisos": [
+                {
+                    "identificador_nacional": compromiso.organizacion.identificador_nacional,
+                    "nivel_gravedad": compromiso.nivel_gravedad,
+                    "estado": compromiso.estado,
+                    "items": [
+                        {
+                            "codigo_recurso": item.inventario_item.item.codigo_recurso,
+                            "cantidad": item.cantidad_comprometida,
+                            "tipo_asignacion": item.tipo_asignacion,
+                        }
+                        for item in compromiso.items
+                    ],
+                }
+                for compromiso in resultado.compromisos
+            ],
+        }
+
+
+@blueprint_compromisos.route(
+    "/<string:emergencia_externa_id>/ongs/<string:identificador_nacional>/liberacion"
+)
+class LiberacionDeRecursosONG(MethodView):
+    @blueprint_compromisos.requiere_rol(Rol.sistema)
+    @blueprint_compromisos.response(
+        200,
+        RespuestaLiberacion,
+        description=(
+            "Libera los recursos comprometidos por una ONG para una emergencia; "
+            "repetir la solicitud no reintegra inventario nuevamente."
+        ),
+    )
+    @blueprint_compromisos.alt_response(
+        404,
+        schema=RespuestaError,
+        description="No hay un compromiso para la ONG y emergencia indicadas.",
+    )
+    @blueprint_compromisos.alt_response(
+        409,
+        schema=RespuestaError,
+        description="El estado actual del compromiso impide liberarlo.",
+    )
+    def post(self, emergencia_externa_id: str, identificador_nacional: str):
+        """Liberar el compromiso de una ONG al descartar su oferta."""
+        resultado = servicios.liberar_recursos_ong(
+            emergencia_externa_id=emergencia_externa_id,
+            identificador_nacional=identificador_nacional,
+        )
+        return {
+            "emergencia_externa_id": emergencia_externa_id.strip(),
+            "repetido": resultado.repetido,
+            "compromisos": [
+                {
+                    "identificador_nacional": compromiso.organizacion.identificador_nacional,
+                    "nivel_gravedad": compromiso.nivel_gravedad,
+                    "estado": compromiso.estado,
+                    "items": [
+                        {
+                            "codigo_recurso": item.inventario_item.item.codigo_recurso,
+                            "cantidad": item.cantidad_comprometida,
+                            "tipo_asignacion": item.tipo_asignacion,
+                        }
+                        for item in compromiso.items
+                    ],
+                }
+                for compromiso in resultado.compromisos
+            ],
+        }
+
+
 EJEMPLO_VALIDACION = {
     "emergencia_externa_id": "emergencia-demo-01",
     "nivel_gravedad": "MEDIA",
@@ -197,38 +295,31 @@ class ValidacionDeRestricciones(MethodView):
         }
 
 
-@blueprint_compromisos.route(
-    "/<string:emergencia_externa_id>/ongs/<string:identificador_nacional>/finalizacion"
-)
-class FinalizacionDeActividades(MethodView):
+@blueprint_compromisos.route("/<string:emergencia_externa_id>/finalizacion")
+class FinalizacionDeEmergencia(MethodView):
     @blueprint_compromisos.requiere_rol(Rol.sistema)
     @blueprint_compromisos.response(
         200,
         RespuestaFinalizacion,
         description=(
-            "Registra el cierre de la ONG; libera los recursos al finalizar todas "
-            "las participantes."
+            "Cierra la emergencia y libera todos sus compromisos en una operación atómica."
         ),
     )
     @blueprint_compromisos.alt_response(
         404,
         schema=RespuestaError,
-        description="La emergencia o la ONG participante no tiene compromisos registrados.",
+        description="La emergencia no tiene compromisos registrados.",
     )
     @blueprint_compromisos.alt_response(
         409,
         schema=RespuestaError,
-        description="El proyecto tiene compromisos en un estado que impide finalizarlo.",
+        description="La emergencia tiene compromisos en un estado que impide finalizarla.",
     )
-    def post(self, emergencia_externa_id: str, identificador_nacional: str):
-        """Informar la finalización de una ONG y cerrar el proyecto cuando todas terminen."""
-        resultado = servicios.informar_finalizacion_ong(
-            emergencia_externa_id=emergencia_externa_id,
-            identificador_nacional=identificador_nacional,
-        )
+    def post(self, emergencia_externa_id: str):
+        """Finalizar una emergencia luego de que el proceso confirme todas las tareas."""
+        resultado = servicios.finalizar_emergencia(emergencia_externa_id=emergencia_externa_id)
         return {
             "emergencia_externa_id": resultado.emergencia_externa_id,
-            "identificador_nacional": resultado.identificador_nacional,
             "proyecto_cerrado": resultado.proyecto_cerrado,
             "organizaciones_finalizadas": resultado.organizaciones_finalizadas,
             "organizaciones_participantes": resultado.organizaciones_participantes,

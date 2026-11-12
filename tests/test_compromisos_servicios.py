@@ -9,8 +9,9 @@ from app.modulos.compromisos.servicios import (
     AporteSolicitado,
     DisponibilidadInsuficiente,
     comprometer_recursos,
-    informar_finalizacion_ong,
+    finalizar_emergencia,
     liberar_recursos,
+    liberar_recursos_ong,
     validar_restricciones,
 )
 from app.modulos.organizaciones.modelos import (
@@ -248,30 +249,76 @@ def test_liberar_recursos_falla_si_no_hay_compromisos(base_de_datos):
         liberar_recursos(emergencia_externa_id="inexistente")
 
 
-def test_finalizacion_de_una_ong_no_cierra_el_proyecto_antes_que_las_demas(base_de_datos):
+def test_liberar_recursos_ong_es_selectivo_e_idempotente(base_de_datos):
     comprometer_recursos(
         emergencia_externa_id="13",
         nivel_gravedad="MEDIA",
         aportes=aportes_validos(),
     )
 
-    resultado = informar_finalizacion_ong(
+    primera = liberar_recursos_ong(
+        emergencia_externa_id="13",
+        identificador_nacional="30-11111111-1",
+    )
+    reintento = liberar_recursos_ong(
         emergencia_externa_id="13",
         identificador_nacional="30-11111111-1",
     )
 
-    assert resultado.proyecto_cerrado is False
-    assert resultado.organizaciones_finalizadas == 1
+    assert primera.repetido is False
+    assert reintento.repetido is True
+    assert [fila.cantidad_disponible for fila in db.session.query(InventarioItem)] == [10, 5]
+    compromisos = db.session.query(Compromiso).order_by(Compromiso.id).all()
+    assert [compromiso.estado for compromiso in compromisos] == [
+        EstadoCompromiso.liberado,
+        EstadoCompromiso.comprometido,
+    ]
+
+
+def test_finalizacion_global_libera_solo_compromisos_aun_activos(base_de_datos):
+    comprometer_recursos(
+        emergencia_externa_id="13",
+        nivel_gravedad="MEDIA",
+        aportes=aportes_validos(),
+    )
+    liberar_recursos_ong(
+        emergencia_externa_id="13",
+        identificador_nacional="30-11111111-1",
+    )
+
+    resultado = finalizar_emergencia(emergencia_externa_id="13")
+
+    assert resultado.repetido is False
+    assert resultado.proyecto_cerrado is True
+    assert [fila.cantidad_disponible for fila in db.session.query(InventarioItem)] == [10, 8]
+    compromisos = db.session.query(Compromiso).order_by(Compromiso.id).all()
+    assert all(compromiso.estado is EstadoCompromiso.liberado for compromiso in compromisos)
+    assert all(compromiso.fecha_cierre_proyecto is not None for compromiso in compromisos)
+    reintento = finalizar_emergencia(emergencia_externa_id="13")
+    assert reintento.repetido is True
+    assert [fila.cantidad_disponible for fila in db.session.query(InventarioItem)] == [10, 8]
+
+
+def test_finalizacion_global_cierra_emergencia_y_libera_todos_los_compromisos(base_de_datos):
+    comprometer_recursos(
+        emergencia_externa_id="13",
+        nivel_gravedad="MEDIA",
+        aportes=aportes_validos(),
+    )
+
+    resultado = finalizar_emergencia(emergencia_externa_id="13")
+
+    assert resultado.proyecto_cerrado is True
+    assert resultado.organizaciones_finalizadas == 2
     assert resultado.organizaciones_participantes == 2
     compromisos = db.session.query(Compromiso).order_by(Compromiso.id).all()
-    assert compromisos[0].fecha_finalizacion_ong is not None
-    assert compromisos[0].estado is EstadoCompromiso.comprometido
-    assert compromisos[0].fecha_cierre_proyecto is None
-    assert compromisos[1].fecha_finalizacion_ong is None
-    assert [fila.cantidad_disponible for fila in db.session.query(InventarioItem)] == [6, 5]
+    assert all(compromiso.estado is EstadoCompromiso.liberado for compromiso in compromisos)
+    assert all(compromiso.fecha_liberacion is not None for compromiso in compromisos)
+    assert all(compromiso.fecha_cierre_proyecto is not None for compromiso in compromisos)
+    assert [fila.cantidad_disponible for fila in db.session.query(InventarioItem)] == [10, 8]
 
 
-def test_ultima_finalizacion_cierra_proyecto_y_devuelve_solo_no_consumibles(base_de_datos):
+def test_finalizacion_global_devuelve_solo_no_consumibles(base_de_datos):
     item_reutilizable = Item(
         codigo_recurso="RSR-CAMILLAS",
         nombre="Camillas",
@@ -309,16 +356,7 @@ def test_ultima_finalizacion_cierra_proyecto_y_devuelve_solo_no_consumibles(base
         nivel_gravedad="MEDIA",
         aportes=aportes,
     )
-    informar_finalizacion_ong(
-        emergencia_externa_id="13",
-        identificador_nacional="30-11111111-1",
-    )
-    db.session.commit()
-
-    resultado = informar_finalizacion_ong(
-        emergencia_externa_id="13",
-        identificador_nacional="30-22222222-2",
-    )
+    resultado = finalizar_emergencia(emergencia_externa_id="13")
 
     assert resultado.proyecto_cerrado is True
     assert resultado.organizaciones_finalizadas == 2
@@ -341,42 +379,40 @@ def test_ultima_finalizacion_cierra_proyecto_y_devuelve_solo_no_consumibles(base
     }
 
 
-def test_finalizacion_de_ong_es_idempotente(base_de_datos):
+def test_finalizacion_global_es_idempotente(base_de_datos):
     comprometer_recursos(
         emergencia_externa_id="13",
         nivel_gravedad="MEDIA",
         aportes=aportes_validos(),
     )
-    primera = informar_finalizacion_ong(
-        emergencia_externa_id="13",
-        identificador_nacional="30-11111111-1",
-    )
-    db.session.commit()
-
-    reintento = informar_finalizacion_ong(
-        emergencia_externa_id="13",
-        identificador_nacional="30-11111111-1",
-    )
+    primera = finalizar_emergencia(emergencia_externa_id="13")
+    reintento = finalizar_emergencia(emergencia_externa_id="13")
 
     assert primera.repetido is False
     assert reintento.repetido is True
-    assert reintento.proyecto_cerrado is False
-    assert reintento.organizaciones_finalizadas == 1
-    assert [fila.cantidad_disponible for fila in db.session.query(InventarioItem)] == [6, 5]
+    assert reintento.proyecto_cerrado is True
+    assert reintento.organizaciones_finalizadas == 2
+    assert [fila.cantidad_disponible for fila in db.session.query(InventarioItem)] == [10, 8]
 
 
-def test_finalizacion_rechaza_ong_que_no_participa(base_de_datos):
+def test_finalizacion_global_rechaza_emergencia_sin_compromisos(base_de_datos):
+    with pytest.raises(RecursoNoEncontrado):
+        finalizar_emergencia(emergencia_externa_id="13")
+
+
+def test_finalizacion_global_no_cierra_emergencia_ya_liberada_para_reinicio(base_de_datos):
     comprometer_recursos(
         emergencia_externa_id="13",
         nivel_gravedad="MEDIA",
         aportes=aportes_validos(),
     )
+    liberar_recursos(emergencia_externa_id="13")
+    db.session.commit()
 
-    with pytest.raises(RecursoNoEncontrado):
-        informar_finalizacion_ong(
-            emergencia_externa_id="13",
-            identificador_nacional="30-33333333-3",
-        )
+    with pytest.raises(ConflictoDeEstado):
+        finalizar_emergencia(emergencia_externa_id="13")
+
+    assert [fila.cantidad_disponible for fila in db.session.query(InventarioItem)] == [10, 8]
 
 
 def test_validar_restricciones_recursos_suficientes_devuelve_valido_true(base_de_datos):

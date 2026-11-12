@@ -78,33 +78,66 @@ La idempotencia inicial se basa en `emergencia_externa_id` y en la igualdad exac
 del compromiso. La cabecera estándar `Idempotency-Key` queda pendiente; su estado se describe en
 [el contrato de errores](errores.md).
 
-## `POST /recursos/compromisos/{emergencia_externa_id}/ongs/{identificador_nacional}/finalizacion`
+## `POST /recursos/compromisos/{emergencia_externa_id}/liberacion`
 
-Requiere rol `sistema`. No necesita cuerpo. Registra la finalización de las actividades de una ONG
-que participa en esa emergencia. El proyecto permanece abierto hasta que todas las ONGs con
-compromisos registrados hayan informado su finalización.
+Requiere rol `sistema`. No necesita cuerpo. Libera todos los compromisos de la emergencia
+indicada y devuelve al inventario los recursos no consumibles. Se usa cuando el proceso decide
+reiniciar la convocatoria completa; no registra la finalización de la emergencia.
 
-La llamada responde `200 OK` con el estado de avance:
+Responde `200 OK` con los compromisos liberados. El campo `repetido` es `true` si ya estaban
+liberados, y los reintentos no vuelven a incrementar el inventario.
+
+| HTTP | Código | Significado |
+|---|---|---|
+| 200 | — | Recursos liberados o solicitud repetida |
+| 401 / 403 | `NO_AUTENTICADO` / `PERMISO_DENEGADO` | Token ausente/inválido o rol distinto de `sistema` |
+| 404 | `RECURSO_NO_ENCONTRADO` | No hay compromisos para la emergencia |
+| 409 | `CONFLICTO_DE_ESTADO` | El estado actual de los compromisos impide liberar |
+
+## `POST /recursos/compromisos/{emergencia_externa_id}/ongs/{identificador_nacional}/liberacion`
+
+Requiere rol `sistema`. No necesita cuerpo. Libera todos los recursos comprometidos por una ONG
+para una emergencia. Se usa cuando se descarta la oferta de esa ONG; en un consorcio el proceso
+invoca este endpoint una vez por cada organización participante. Los recursos no consumibles
+vuelven al inventario y los consumibles permanecen descontados.
+
+Responde `200 OK` con el compromiso liberado. Las repeticiones son idempotentes (`repetido: true`)
+y no reintegran recursos de nuevo.
+
+| HTTP | Código | Significado |
+|---|---|---|
+| 200 | — | Compromiso liberado o solicitud repetida |
+| 401 / 403 | `NO_AUTENTICADO` / `PERMISO_DENEGADO` | Token ausente/inválido o rol distinto de `sistema` |
+| 404 | `RECURSO_NO_ENCONTRADO` | No hay un compromiso para esa ONG y emergencia |
+| 409 | `CONFLICTO_DE_ESTADO` | El estado del compromiso impide liberarlo |
+
+## `POST /recursos/compromisos/{emergencia_externa_id}/finalizacion`
+
+Requiere rol `sistema`. No necesita cuerpo. Bonita invoca el endpoint cuando ya confirmó que
+terminaron todas las tareas de la emergencia. La API cierra la emergencia y libera todos sus
+compromisos aún activos en una única transacción. Los compromisos ya liberados individualmente
+se incluyen en el cierre sin reintegrar nuevamente su inventario.
+
+La llamada responde `200 OK` con el resultado del cierre:
 
 ```json
 {
   "emergencia_externa_id": "emergencia-2026-0042",
-  "identificador_nacional": "30-11111111-1",
-  "proyecto_cerrado": false,
-  "organizaciones_finalizadas": 1,
+  "proyecto_cerrado": true,
+  "organizaciones_finalizadas": 2,
   "organizaciones_participantes": 2,
   "repetido": false
 }
 ```
 
-Cuando finaliza la última ONG, el servicio cierra el proyecto en la misma transacción en que marca
-los compromisos como liberados. Devuelve al inventario solo los recursos no consumibles; los
-consumibles permanecen descontados. Una notificación repetida no cuenta dos veces ni duplica el
-reintegro. El campo `repetido` indica si esa ONG ya había notificado la finalización.
+La respuesta informa cuántas organizaciones tienen compromisos registrados, todas consideradas
+finalizadas por la confirmación global del proceso. Devuelve al inventario solo los recursos no
+consumibles; los consumibles permanecen descontados. Una llamada repetida no duplica el reintegro;
+`repetido` indica si la emergencia ya había sido cerrada.
 
 | HTTP | Código | Significado |
 |---|---|---|
-| 200 | — | Finalización registrada o repetición idempotente |
+| 200 | — | Emergencia finalizada o repetición idempotente |
 | 401 / 403 | `NO_AUTENTICADO` / `PERMISO_DENEGADO` | Token ausente/inválido o rol distinto de `sistema` |
-| 404 | `RECURSO_NO_ENCONTRADO` | No hay compromisos para la emergencia o la ONG no participa |
+| 404 | `RECURSO_NO_ENCONTRADO` | No hay compromisos para la emergencia |
 | 409 | `CONFLICTO_DE_ESTADO` | El estado actual de los compromisos impide completar el cierre |
