@@ -69,7 +69,6 @@ class ResultadoLiberacion:
 @dataclass(frozen=True)
 class ResultadoFinalizacion:
     emergencia_externa_id: str
-    identificador_nacional: str
     proyecto_cerrado: bool
     organizaciones_finalizadas: int
     organizaciones_participantes: int
@@ -503,6 +502,42 @@ def comprometer_recursos(
         )
 
 
+def _liberar_compromisos_bloqueados(compromisos: list[Compromiso]) -> None:
+    """Devuelve inventario y marca como liberados compromisos ya bloqueados."""
+    ids_compromisos = [compromiso.id for compromiso in compromisos]
+    items_comprometidos = db.session.scalars(
+        select(CompromisoItem)
+        .where(CompromisoItem.compromiso_id.in_(ids_compromisos))
+        .order_by(CompromisoItem.id)
+        .with_for_update()
+    ).all()
+    ids_inventario = sorted(
+        {item_comprometido.inventario_item_id for item_comprometido in items_comprometidos}
+    )
+    inventario_items = db.session.scalars(
+        select(InventarioItem)
+        .where(InventarioItem.id.in_(ids_inventario))
+        .order_by(InventarioItem.id)
+        .with_for_update()
+    ).all()
+    inventario_por_id = {item.id: item for item in inventario_items}
+
+    for item_comprometido in items_comprometidos:
+        inventario_item = inventario_por_id.get(item_comprometido.inventario_item_id)
+        if inventario_item is None:
+            raise RecursoNoEncontrado(
+                "No se encontró una fila de inventario asociada al compromiso.",
+                detalle={"inventario_item_id": item_comprometido.inventario_item_id},
+            )
+        if not inventario_item.item.consumible:
+            inventario_item.cantidad_disponible += item_comprometido.cantidad_comprometida
+
+    fecha_liberacion = datetime.now(UTC)
+    for compromiso in compromisos:
+        compromiso.estado = EstadoCompromiso.liberado
+        compromiso.fecha_liberacion = fecha_liberacion
+
+
 def liberar_recursos(*, emergencia_externa_id: str) -> ResultadoLiberacion:
     """Libera los compromisos de una emergencia y devuelve solo recursos no consumibles."""
     emergencia_id = emergencia_externa_id.strip()
@@ -534,49 +569,17 @@ def liberar_recursos(*, emergencia_externa_id: str) -> ResultadoLiberacion:
                 detalle={"emergencia_externa_id": emergencia_id},
             )
 
-        ids_compromisos = [compromiso.id for compromiso in compromisos]
-        items_comprometidos = db.session.scalars(
-            select(CompromisoItem)
-            .where(CompromisoItem.compromiso_id.in_(ids_compromisos))
-            .order_by(CompromisoItem.id)
-            .with_for_update()
-        ).all()
-        ids_inventario = sorted(
-            {item_comprometido.inventario_item_id for item_comprometido in items_comprometidos}
-        )
-        inventario_items = db.session.scalars(
-            select(InventarioItem)
-            .where(InventarioItem.id.in_(ids_inventario))
-            .order_by(InventarioItem.id)
-            .with_for_update()
-        ).all()
-        inventario_por_id = {item.id: item for item in inventario_items}
-
-        for item_comprometido in items_comprometidos:
-            inventario_item = inventario_por_id.get(item_comprometido.inventario_item_id)
-            if inventario_item is None:
-                raise RecursoNoEncontrado(
-                    "No se encontró una fila de inventario asociada al compromiso.",
-                    detalle={"inventario_item_id": item_comprometido.inventario_item_id},
-                )
-            if not inventario_item.item.consumible:
-                inventario_item.cantidad_disponible += item_comprometido.cantidad_comprometida
-
-        fecha_liberacion = datetime.now(UTC)
-        for compromiso in compromisos:
-            compromiso.estado = EstadoCompromiso.liberado
-            compromiso.fecha_liberacion = fecha_liberacion
-
+        _liberar_compromisos_bloqueados(compromisos)
         db.session.flush()
         return ResultadoLiberacion(tuple(compromisos), repetido=False)
 
 
-def informar_finalizacion_ong(
+def liberar_recursos_ong(
     *,
     emergencia_externa_id: str,
     identificador_nacional: str,
-) -> ResultadoFinalizacion:
-    """Registra el cierre de una ONG y cierra/libera el proyecto al finalizar todas."""
+) -> ResultadoLiberacion:
+    """Libera el compromiso de una ONG para una emergencia de forma idempotente."""
     emergencia_id = emergencia_externa_id.strip()
     identificador = identificador_nacional.strip()
     if not emergencia_id:
@@ -587,6 +590,49 @@ def informar_finalizacion_ong(
         raise ReglaDeNegocioIncumplida("La organización debe identificarse.")
     if len(identificador) > 255:
         raise ReglaDeNegocioIncumplida("El identificador nacional es demasiado largo.")
+
+    with _transaccion_atomica():
+        compromiso = db.session.scalar(
+            select(Compromiso)
+            .join(Compromiso.organizacion)
+            .where(
+                Compromiso.emergencia_externa_id == emergencia_id,
+                Organizacion.identificador_nacional == identificador,
+            )
+            .with_for_update()
+        )
+        if compromiso is None:
+            raise RecursoNoEncontrado(
+                "No se encontró un compromiso para la ONG y emergencia indicadas.",
+                detalle={
+                    "emergencia_externa_id": emergencia_id,
+                    "identificador_nacional": identificador,
+                },
+            )
+
+        if compromiso.estado is EstadoCompromiso.liberado:
+            return ResultadoLiberacion((compromiso,), repetido=True)
+        if compromiso.estado is not EstadoCompromiso.comprometido:
+            raise ConflictoDeEstado(
+                "El compromiso de la ONG no se puede liberar en su estado actual.",
+                detalle={
+                    "emergencia_externa_id": emergencia_id,
+                    "identificador_nacional": identificador,
+                },
+            )
+
+        _liberar_compromisos_bloqueados([compromiso])
+        db.session.flush()
+        return ResultadoLiberacion((compromiso,), repetido=False)
+
+
+def finalizar_emergencia(*, emergencia_externa_id: str) -> ResultadoFinalizacion:
+    """Cierra una emergencia y libera todos sus compromisos en una operación atómica."""
+    emergencia_id = emergencia_externa_id.strip()
+    if not emergencia_id:
+        raise ReglaDeNegocioIncumplida("La emergencia externa debe identificarse.")
+    if len(emergencia_id) > 255:
+        raise ReglaDeNegocioIncumplida("La referencia externa de emergencia es demasiado larga.")
 
     with _transaccion_atomica():
         compromisos = db.session.scalars(
@@ -601,87 +647,58 @@ def informar_finalizacion_ong(
                 detalle={"emergencia_externa_id": emergencia_id},
             )
 
-        compromiso_por_organizacion = {
-            compromiso.organizacion.identificador_nacional: compromiso for compromiso in compromisos
-        }
-        compromiso_ong = compromiso_por_organizacion.get(identificador)
-        if compromiso_ong is None:
-            raise RecursoNoEncontrado(
-                "La organización no participa en el proyecto indicado.",
-                detalle={
-                    "emergencia_externa_id": emergencia_id,
-                    "identificador_nacional": identificador,
-                },
-            )
-
-        if all(compromiso.estado is EstadoCompromiso.liberado for compromiso in compromisos):
+        organizaciones_participantes = len(compromisos)
+        if all(
+            compromiso.estado is EstadoCompromiso.liberado
+            and compromiso.fecha_cierre_proyecto is not None
+            for compromiso in compromisos
+        ):
             return ResultadoFinalizacion(
                 emergencia_externa_id=emergencia_id,
-                identificador_nacional=identificador,
                 proyecto_cerrado=True,
-                organizaciones_finalizadas=len(compromisos),
-                organizaciones_participantes=len(compromisos),
+                organizaciones_finalizadas=organizaciones_participantes,
+                organizaciones_participantes=organizaciones_participantes,
                 repetido=True,
             )
+        if all(compromiso.estado is EstadoCompromiso.liberado for compromiso in compromisos):
+            raise ConflictoDeEstado(
+                "La emergencia ya fue liberada para reiniciarse, no finalizada.",
+                detalle={"emergencia_externa_id": emergencia_id},
+            )
         if any(
-            compromiso.estado is not EstadoCompromiso.comprometido for compromiso in compromisos
+            compromiso.estado not in (EstadoCompromiso.comprometido, EstadoCompromiso.liberado)
+            for compromiso in compromisos
         ):
             raise ConflictoDeEstado(
-                "El proyecto tiene compromisos que no se pueden finalizar.",
+                "La emergencia tiene compromisos que no se pueden finalizar.",
+                detalle={"emergencia_externa_id": emergencia_id},
+            )
+        if any(
+            compromiso.estado is EstadoCompromiso.liberado
+            and compromiso.fecha_cierre_proyecto is not None
+            for compromiso in compromisos
+        ):
+            raise ConflictoDeEstado(
+                "La emergencia tiene un cierre parcial incompatible.",
                 detalle={"emergencia_externa_id": emergencia_id},
             )
 
-        repetido = compromiso_ong.fecha_finalizacion_ong is not None
-        if not repetido:
-            compromiso_ong.fecha_finalizacion_ong = datetime.now(UTC)
-
-        organizaciones_finalizadas = sum(
-            compromiso.fecha_finalizacion_ong is not None for compromiso in compromisos
-        )
-        organizaciones_participantes = len(compromisos)
-        proyecto_cerrado = organizaciones_finalizadas == organizaciones_participantes
-
-        if proyecto_cerrado:
-            ids_compromisos = [compromiso.id for compromiso in compromisos]
-            items_comprometidos = db.session.scalars(
-                select(CompromisoItem)
-                .where(CompromisoItem.compromiso_id.in_(ids_compromisos))
-                .order_by(CompromisoItem.id)
-                .with_for_update()
-            ).all()
-            ids_inventario = sorted(
-                {item_comprometido.inventario_item_id for item_comprometido in items_comprometidos}
-            )
-            inventario_items = db.session.scalars(
-                select(InventarioItem)
-                .where(InventarioItem.id.in_(ids_inventario))
-                .order_by(InventarioItem.id)
-                .with_for_update()
-            ).all()
-            inventario_por_id = {item.id: item for item in inventario_items}
-
-            for item_comprometido in items_comprometidos:
-                inventario_item = inventario_por_id.get(item_comprometido.inventario_item_id)
-                if inventario_item is None:
-                    raise RecursoNoEncontrado(
-                        "No se encontró una fila de inventario asociada al compromiso.",
-                        detalle={"inventario_item_id": item_comprometido.inventario_item_id},
-                    )
-                if not inventario_item.item.consumible:
-                    inventario_item.cantidad_disponible += item_comprometido.cantidad_comprometida
-
-            fecha_cierre = datetime.now(UTC)
-            for compromiso in compromisos:
-                compromiso.estado = EstadoCompromiso.liberado
-                compromiso.fecha_liberacion = fecha_cierre
-                compromiso.fecha_cierre_proyecto = fecha_cierre
+        fecha_cierre = datetime.now(UTC)
+        compromisos_activos = [
+            compromiso
+            for compromiso in compromisos
+            if compromiso.estado is EstadoCompromiso.comprometido
+        ]
+        if compromisos_activos:
+            _liberar_compromisos_bloqueados(compromisos_activos)
+        for compromiso in compromisos:
+            compromiso.fecha_cierre_proyecto = fecha_cierre
 
         db.session.flush()
         return ResultadoFinalizacion(
             emergencia_externa_id=emergencia_id,
-            identificador_nacional=identificador,
-            proyecto_cerrado=proyecto_cerrado,
-            organizaciones_finalizadas=organizaciones_finalizadas,
+            proyecto_cerrado=True,
+            organizaciones_finalizadas=organizaciones_participantes,
             organizaciones_participantes=organizaciones_participantes,
-            repetido=repetido,
+            repetido=False,
         )

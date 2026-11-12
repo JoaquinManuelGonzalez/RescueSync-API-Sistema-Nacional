@@ -176,7 +176,108 @@ def test_stock_insuficiente_responde_422_y_no_guarda_parte_del_compromiso(
     assert db.session.query(Compromiso).count() == 0
 
 
-def test_finalizacion_ong_cierra_proyecto_y_devuelve_el_estado(
+def test_liberar_recursos_devuelve_inventario_y_es_idempotente(
+    cliente,
+    cabeceras,
+    inventario_disponible,
+):
+    cliente.post(
+        "/recursos/compromisos",
+        json=PETICION,
+        headers=cabeceras(Rol.sistema),
+    )
+
+    primera = cliente.post(
+        "/recursos/compromisos/emergencia-42/liberacion",
+        headers=cabeceras(Rol.sistema),
+    )
+    segunda = cliente.post(
+        "/recursos/compromisos/emergencia-42/liberacion",
+        headers=cabeceras(Rol.sistema),
+    )
+
+    assert primera.status_code == 200
+    assert primera.get_json() == {
+        "emergencia_externa_id": "emergencia-42",
+        "repetido": False,
+        "compromisos": [
+            {
+                "identificador_nacional": "30-11111111-1",
+                "nivel_gravedad": "MEDIO",
+                "estado": "LIBERADO",
+                "items": [
+                    {
+                        "codigo_recurso": "RSR-AGUA",
+                        "cantidad": 4,
+                        "tipo_asignacion": "principal",
+                    }
+                ],
+            }
+        ],
+    }
+    assert segunda.status_code == 200
+    assert segunda.get_json()["repetido"] is True
+    assert inventario_disponible.inventario.items[0].cantidad_disponible == 10
+    assert db.session.query(Compromiso).one().estado.value == "LIBERADO"
+
+
+def test_liberar_recursos_requiere_rol_sistema(cliente, cabeceras):
+    respuesta = cliente.post(
+        "/recursos/compromisos/emergencia-42/liberacion",
+        headers=cabeceras(Rol.administrador),
+    )
+
+    assert respuesta.status_code == 403
+
+
+def test_liberar_recursos_sin_compromisos_responde_404(cliente, cabeceras):
+    respuesta = cliente.post(
+        "/recursos/compromisos/emergencia-inexistente/liberacion",
+        headers=cabeceras(Rol.sistema),
+    )
+
+    assert respuesta.status_code == 404
+    assert respuesta.get_json()["error"]["codigo"] == "RECURSO_NO_ENCONTRADO"
+
+
+def test_liberar_recursos_de_ong_es_idempotente(cliente, cabeceras, inventario_disponible):
+    cliente.post(
+        "/recursos/compromisos",
+        json=PETICION,
+        headers=cabeceras(Rol.sistema),
+    )
+    endpoint = "/recursos/compromisos/emergencia-42/ongs/30-11111111-1/liberacion"
+
+    primera = cliente.post(endpoint, headers=cabeceras(Rol.sistema))
+    segunda = cliente.post(endpoint, headers=cabeceras(Rol.sistema))
+
+    assert primera.status_code == segunda.status_code == 200
+    assert primera.get_json()["repetido"] is False
+    assert primera.get_json()["compromisos"][0]["estado"] == "LIBERADO"
+    assert segunda.get_json()["repetido"] is True
+    assert inventario_disponible.inventario.items[0].cantidad_disponible == 10
+
+
+def test_liberar_recursos_de_ong_requiere_rol_sistema(cliente, cabeceras):
+    respuesta = cliente.post(
+        "/recursos/compromisos/emergencia-42/ongs/30-11111111-1/liberacion",
+        headers=cabeceras(Rol.administrador),
+    )
+
+    assert respuesta.status_code == 403
+
+
+def test_liberar_recursos_de_ong_sin_compromiso_responde_404(cliente, cabeceras):
+    respuesta = cliente.post(
+        "/recursos/compromisos/emergencia-42/ongs/30-11111111-1/liberacion",
+        headers=cabeceras(Rol.sistema),
+    )
+
+    assert respuesta.status_code == 404
+    assert respuesta.get_json()["error"]["codigo"] == "RECURSO_NO_ENCONTRADO"
+
+
+def test_finalizacion_global_cierra_emergencia_y_devuelve_el_estado(
     cliente,
     cabeceras,
     inventario_disponible,
@@ -188,14 +289,13 @@ def test_finalizacion_ong_cierra_proyecto_y_devuelve_el_estado(
     )
 
     respuesta = cliente.post(
-        "/recursos/compromisos/emergencia-42/ongs/30-11111111-1/finalizacion",
+        "/recursos/compromisos/emergencia-42/finalizacion",
         headers=cabeceras(Rol.sistema),
     )
 
     assert respuesta.status_code == 200
     assert respuesta.get_json() == {
         "emergencia_externa_id": "emergencia-42",
-        "identificador_nacional": "30-11111111-1",
         "proyecto_cerrado": True,
         "organizaciones_finalizadas": 1,
         "organizaciones_participantes": 1,
@@ -205,24 +305,35 @@ def test_finalizacion_ong_cierra_proyecto_y_devuelve_el_estado(
     assert inventario_disponible.inventario.items[0].cantidad_disponible == 10
 
 
-def test_finalizacion_ong_requiere_rol_sistema(cliente, cabeceras):
+def test_finalizacion_global_es_idempotente(cliente, cabeceras, inventario_disponible):
+    cliente.post(
+        "/recursos/compromisos",
+        json=PETICION,
+        headers=cabeceras(Rol.sistema),
+    )
+    endpoint = "/recursos/compromisos/emergencia-42/finalizacion"
+
+    primera = cliente.post(endpoint, headers=cabeceras(Rol.sistema))
+    segunda = cliente.post(endpoint, headers=cabeceras(Rol.sistema))
+
+    assert primera.status_code == segunda.status_code == 200
+    assert primera.get_json()["repetido"] is False
+    assert segunda.get_json()["repetido"] is True
+    assert inventario_disponible.inventario.items[0].cantidad_disponible == 10
+
+
+def test_finalizacion_global_requiere_rol_sistema(cliente, cabeceras):
     respuesta = cliente.post(
-        "/recursos/compromisos/emergencia-42/ongs/30-11111111-1/finalizacion",
+        "/recursos/compromisos/emergencia-42/finalizacion",
         headers=cabeceras(Rol.administrador),
     )
 
     assert respuesta.status_code == 403
 
 
-def test_finalizacion_ong_inexistente_responde_404(cliente, cabeceras, inventario_disponible):
-    cliente.post(
-        "/recursos/compromisos",
-        json=PETICION,
-        headers=cabeceras(Rol.sistema),
-    )
-
+def test_finalizacion_global_sin_compromisos_responde_404(cliente, cabeceras):
     respuesta = cliente.post(
-        "/recursos/compromisos/emergencia-42/ongs/30-22222222-2/finalizacion",
+        "/recursos/compromisos/emergencia-42/finalizacion",
         headers=cabeceras(Rol.sistema),
     )
 

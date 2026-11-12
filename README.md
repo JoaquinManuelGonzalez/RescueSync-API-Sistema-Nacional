@@ -167,7 +167,7 @@ migrations/             migraciones de Alembic (0001: línea base;
                         a63f9d20bc41: alineación con el diagrama;
                         b8e41c7d2f90: cuentas y estado de habilitación;
                         c0ebb05602a1: merge de ramas;
-                        4a7c2d9e1f63: finalización por ONG y cierre de proyecto)
+                        4a7c2d9e1f63: cierre global de emergencia y liberación de recursos)
 tests/                  tests con pytest (SQLite en memoria)
 docs/adr/               decisiones de arquitectura
 docs/contratos/         contratos de autenticación, configuración, errores y logging

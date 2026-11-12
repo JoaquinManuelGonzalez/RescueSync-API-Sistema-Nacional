@@ -77,9 +77,12 @@ class RespuestaCompromiso(Schema):
     compromisos = fields.List(fields.Nested(CompromisoRespuesta), required=True)
 
 
+class RespuestaLiberacion(RespuestaCompromiso):
+    """Estado de compromisos tras liberar los recursos de una emergencia."""
+
+
 class RespuestaFinalizacion(Schema):
     emergencia_externa_id = fields.String(required=True)
-    identificador_nacional = fields.String(required=True)
     proyecto_cerrado = fields.Boolean(required=True)
     organizaciones_finalizadas = fields.Integer(required=True)
     organizaciones_participantes = fields.Integer(required=True)
