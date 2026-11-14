@@ -221,6 +221,34 @@ def test_liberar_recursos_devuelve_inventario_y_es_idempotente(
     assert db.session.query(Compromiso).one().estado.value == "LIBERADO"
 
 
+def test_reinicio_convocatoria_permite_volver_a_comprometer(
+    cliente,
+    cabeceras,
+    inventario_disponible,
+):
+    endpoint_compromisos = "/recursos/compromisos"
+    endpoint_liberacion = "/recursos/compromisos/emergencia-42/liberacion"
+
+    primera = cliente.post(
+        endpoint_compromisos,
+        json=PETICION,
+        headers=cabeceras(Rol.sistema),
+    )
+    liberacion = cliente.post(endpoint_liberacion, headers=cabeceras(Rol.sistema))
+    segunda = cliente.post(
+        endpoint_compromisos,
+        json=PETICION,
+        headers=cabeceras(Rol.sistema),
+    )
+
+    assert primera.status_code == 201
+    assert liberacion.status_code == 200
+    assert segunda.status_code == 201
+    assert segunda.get_json()["repetido"] is False
+    assert db.session.query(Compromiso).one().estado.value == "COMPROMETIDO"
+    assert inventario_disponible.inventario.items[0].cantidad_disponible == 6
+
+
 def test_liberar_recursos_requiere_rol_sistema(cliente, cabeceras):
     respuesta = cliente.post(
         "/recursos/compromisos/emergencia-42/liberacion",
