@@ -76,7 +76,10 @@ incompatibles o no hay stock suficiente, no se descuenta ningún aporte parcial.
 
 La idempotencia inicial se basa en `emergencia_externa_id` y en la igualdad exacta de los datos
 del compromiso. La cabecera estándar `Idempotency-Key` queda pendiente; su estado se describe en
-[el contrato de errores](errores.md).
+[el contrato de errores](errores.md). Luego de liberar los compromisos para reiniciar la
+convocatoria, una nueva solicitud puede registrar los aportes de la nueva vuelta, incluso si
+cambiaron las organizaciones o cantidades. Los compromisos liberados existentes se reutilizan;
+una emergencia finalizada globalmente no admite nuevos compromisos.
 
 ## `POST /recursos/compromisos/{emergencia_externa_id}/liberacion`
 
@@ -85,7 +88,8 @@ indicada y devuelve al inventario los recursos no consumibles. Se usa cuando el 
 reiniciar la convocatoria completa; no registra la finalización de la emergencia.
 
 Responde `200 OK` con los compromisos liberados. El campo `repetido` es `true` si ya estaban
-liberados, y los reintentos no vuelven a incrementar el inventario.
+liberados, y los reintentos no vuelven a incrementar el inventario. Si ya hubo liberaciones
+selectivas, libera los compromisos activos restantes sin volver a reintegrar los ya liberados.
 
 | HTTP | Código | Significado |
 |---|---|---|

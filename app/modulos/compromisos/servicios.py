@@ -419,13 +419,35 @@ def comprometer_recursos(
             .order_by(Compromiso.organizacion_id)
             .with_for_update()
         ).all()
-        if _validar_repeticion(
-            compromisos_existentes,
-            solicitud,
-            inventario_por_clave,
-            gravedad,
+        if any(
+            compromiso.fecha_cierre_proyecto is not None for compromiso in compromisos_existentes
         ):
-            return ResultadoCompromiso(tuple(compromisos_existentes), repetido=True)
+            raise ConflictoDeEstado(
+                "La emergencia ya fue finalizada y no admite nuevos compromisos.",
+                detalle={"emergencia_externa_id": emergencia_id},
+            )
+
+        compromisos_activos = [
+            compromiso
+            for compromiso in compromisos_existentes
+            if compromiso.estado is EstadoCompromiso.comprometido
+        ]
+        if compromisos_activos:
+            if _validar_repeticion(
+                compromisos_activos,
+                solicitud,
+                inventario_por_clave,
+                gravedad,
+            ):
+                return ResultadoCompromiso(tuple(compromisos_activos), repetido=True)
+        elif any(
+            compromiso.estado is not EstadoCompromiso.liberado
+            for compromiso in compromisos_existentes
+        ):
+            raise ConflictoDeEstado(
+                "La emergencia tiene compromisos en un estado que impide reiniciar.",
+                detalle={"emergencia_externa_id": emergencia_id},
+            )
 
         # Rechazar organizaciones que no estén habilitadas.
         no_habilitadas = [
@@ -468,16 +490,31 @@ def comprometer_recursos(
                     },
                 )
 
+        compromisos_por_organizacion = {
+            compromiso.organizacion.identificador_nacional: compromiso
+            for compromiso in compromisos_existentes
+        }
         compromisos_nuevos_por_identificador: dict[str, Compromiso] = {}
         for identificador in identificadores:
-            compromiso = Compromiso(
-                organizacion=organizaciones_por_id[identificador],
-                emergencia_externa_id=emergencia_id,
-                nivel_gravedad=gravedad,
-            )
+            compromiso = compromisos_por_organizacion.get(identificador)
+            if compromiso is None:
+                compromiso = Compromiso(
+                    organizacion=organizaciones_por_id[identificador],
+                    emergencia_externa_id=emergencia_id,
+                    nivel_gravedad=gravedad,
+                )
+            else:
+                compromiso.items.clear()
+                compromiso.nivel_gravedad = gravedad
+                compromiso.estado = EstadoCompromiso.comprometido
+                compromiso.fecha_compromiso = datetime.now(UTC)
+                compromiso.fecha_liberacion = None
+                compromiso.fecha_finalizacion_ong = None
+                compromiso.fecha_cierre_proyecto = None
             db.session.add(compromiso)
             compromisos_nuevos_por_identificador[identificador] = compromiso
 
+        db.session.flush()
         for aporte in solicitud:
             item = items_por_codigo[aporte.codigo_recurso]
             inventario_item = inventario_por_clave[
@@ -562,14 +599,20 @@ def liberar_recursos(*, emergencia_externa_id: str) -> ResultadoLiberacion:
         if all(compromiso.estado is EstadoCompromiso.liberado for compromiso in compromisos):
             return ResultadoLiberacion(tuple(compromisos), repetido=True)
         if any(
-            compromiso.estado is not EstadoCompromiso.comprometido for compromiso in compromisos
+            compromiso.estado not in (EstadoCompromiso.comprometido, EstadoCompromiso.liberado)
+            for compromiso in compromisos
         ):
             raise ConflictoDeEstado(
                 "La emergencia tiene compromisos que no se pueden liberar.",
                 detalle={"emergencia_externa_id": emergencia_id},
             )
 
-        _liberar_compromisos_bloqueados(compromisos)
+        activos = [
+            compromiso
+            for compromiso in compromisos
+            if compromiso.estado is EstadoCompromiso.comprometido
+        ]
+        _liberar_compromisos_bloqueados(activos)
         db.session.flush()
         return ResultadoLiberacion(tuple(compromisos), repetido=False)
 
