@@ -20,6 +20,8 @@ class ResultadoSemilla:
     existentes: int = 0
     # Filas que ya existian y el seeder corrigio (por ejemplo, stock repuesto).
     actualizados: int = 0
+    # Como lo informa `flask seed` (por ejemplo, "3 repuestos").
+    etiqueta_actualizados: str = "actualizados"
 
     def contar(self, fue_creado: bool) -> None:
         if fue_creado:

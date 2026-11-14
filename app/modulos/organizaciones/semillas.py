@@ -34,13 +34,15 @@ ORGANIZACIONES_DE_DEMOSTRACION: tuple[tuple[str, TipoOrganizacion, str], ...] = 
     ("Cruz Solidaria", TipoOrganizacion.ong, "30-65432198-7"),
     ("Manos Unidas", TipoOrganizacion.ong, "30-65432199-5"),
     ("Cruz Roja Argentina - Filial Bahía Blanca", TipoOrganizacion.ong, "30-99999999-4"),
-    ("Bomberos Voluntarios de La Plata", TipoOrganizacion.organismo_rescate, "30-99999999-5"),
+    ("Bomberos Voluntarios de La Plata", TipoOrganizacion.ong, "30-99999999-5"),
     ("Grupo Scouts de Pergamino", TipoOrganizacion.ong, "30-99999999-6"),
 )
 
-# Mismos CUIT que las semillas de la aplicacion web: es la clave con la que se cruzan las
+# Mismos nombres, CUIT y tipo que las semillas de la aplicacion web (sus municipios y su centro
+# coordinador son `organismo_rescate` aca): el CUIT es la clave con la que se cruzan las
 # organizaciones de los dos sistemas. Todas arrancan habilitadas salvo las de esta tabla, que
-# muestran el caso de una ONG registrada que con el tiempo quedo inhabilitada.
+# muestran el caso de una ONG registrada que con el tiempo quedo inhabilitada: en la web oferta
+# sin problemas y el Sistema Nacional rechaza sus aportes.
 SUSPENDIDAS_DE_DEMOSTRACION: dict[str, str] = {
     "Cruz Roja Argentina - Filial Bahía Blanca": (
         "Certificación sanitaria vencida (dato de demostración)."
@@ -77,46 +79,139 @@ CERTIFICACIONES: dict[str, tuple[tuple[str, TipoItem], ...]] = {
     ),
 }
 
+# Catalogo compartido con la aplicacion web: mismos nombres (de los que sale `codigo_recurso`),
+# mismo tipo, unidad y consumible que `backend/app/modulos/emergencias/semillas_items.py` del
+# repo RescueSync-Web-App. Bonita reenvia los codigos de la web sin traducirlos, asi que un item
+# que falte aca hace fallar la evaluacion de ofertas con 404. `tests/test_catalogo_compartido.py`
+# compara este catalogo con la copia de la web. Los items nuevos van al final para no cambiar los
+# ids de una base nueva (los ejemplos de Swagger usan algunos).
 ITEMS: dict[str, tuple[TipoItem, str, str]] = {
-    "Agua potable envasada": (TipoItem.agua, "litros", "Agua potable para consumo."),
-    "Paramédicos": (TipoItem.personal_medico, "personas", "Personal paramédico."),
-    "Enfermeros": (TipoItem.personal_medico, "personas", "Personal de enfermería."),
-    "Rescatistas": (TipoItem.rescate, "personas", "Personal especializado en rescate."),
-    "Voluntarios generales": (TipoItem.personal_medico, "personas", "Voluntariado disponible."),
-    "Perros de búsqueda": (TipoItem.rescate, "animales", "Perros entrenados para búsqueda."),
+    "Agua potable envasada": (
+        TipoItem.agua,
+        "litros",
+        "Botellas selladas aptas para consumo humano.",
+    ),
+    "Paramédicos": (
+        TipoItem.personal_medico,
+        "personas",
+        "Personal de atención prehospitalaria con certificación vigente.",
+    ),
+    "Enfermeros": (
+        TipoItem.personal_medico,
+        "personas",
+        "Personal de enfermería para primeros auxilios y cuidados básicos.",
+    ),
+    "Rescatistas": (
+        TipoItem.rescate,
+        "personas",
+        "Personal entrenado en búsqueda y rescate urbano.",
+    ),
+    "Voluntarios generales": (
+        TipoItem.otro,
+        "personas",
+        "Personal de apoyo voluntario no especializado.",
+    ),
+    "Perros de búsqueda": (
+        TipoItem.rescate,
+        "unidades",
+        "Caninos entrenados para detección de personas.",
+    ),
     "Frazadas": (TipoItem.abrigo, "unidades", "Frazadas para personas evacuadas."),
-    "Colchones": (TipoItem.abrigo, "unidades", "Colchones para refugios temporales."),
-    "Carpas familiares": (TipoItem.abrigo, "unidades", "Carpas para alojamiento temporal."),
-    "Antibióticos": (TipoItem.medicamentos, "dosis", "Antibióticos."),
-    "Analgésicos": (TipoItem.medicamentos, "dosis", "Analgésicos."),
+    "Colchones": (
+        TipoItem.abrigo,
+        "unidades",
+        "Colchones de goma espuma para refugios temporales.",
+    ),
+    "Carpas familiares": (TipoItem.abrigo, "unidades", "Carpas para 4-6 personas."),
+    "Antibióticos": (TipoItem.medicamentos, "unidades", "Comprimidos de uso general."),
+    "Analgésicos": (TipoItem.medicamentos, "unidades", "Comprimidos de uso general."),
     "Botiquines de primeros auxilios": (
         TipoItem.medicamentos,
-        "kits",
-        "Botiquines de primeros auxilios.",
+        "unidades",
+        "Kit básico de primeros auxilios.",
     ),
-    "Pañales para adulto": (TipoItem.otro, "unidades", "Pañales para adulto."),
-    "Pañales para bebes": (TipoItem.otro, "unidades", "Pañales para bebés."),
-    "Toallas jabonosas": (TipoItem.otro, "unidades", "Toallas jabonosas."),
-    "Kit higiene bucal": (TipoItem.otro, "kits", "Kits de higiene bucal."),
-    "Suplemento alimenticio": (TipoItem.alimentos, "unidades", "Suplementos alimenticios."),
+    "Pañales para adulto": (TipoItem.medicamentos, "unidades", "Pañales para adulto."),
+    "Pañales para bebes": (TipoItem.otro, "unidades", "Pañales descartables."),
+    "Toallas jabonosas": (
+        TipoItem.otro,
+        "unidades",
+        "Toallas jabonosas desechables y sin enjuague. De aseo para adultos, bebés y niños.",
+    ),
+    "Kit higiene bucal": (
+        TipoItem.otro,
+        "unidades",
+        "Kit individual de cepillo de dientes y pasta dental.",
+    ),
+    "Suplemento alimenticio": (
+        TipoItem.medicamentos,
+        "unidades",
+        "Fuente adicional de nutrientes para personas en situaciones críticas.",
+    ),
     "Raciones de alimento no perecedero": (
         TipoItem.alimentos,
         "raciones",
-        "Raciones de alimento no perecedero.",
+        "Raciones individuales instantáneas, listas para consumo.",
     ),
-    "Leche en polvo": (TipoItem.alimentos, "kilogramos", "Leche en polvo."),
-    "Yerba": (TipoItem.alimentos, "kilogramos", "Yerba mate."),
-    "Lentejas": (TipoItem.alimentos, "kilogramos", "Lentejas."),
-    "Harina de trigo": (TipoItem.alimentos, "kilogramos", "Harina de trigo."),
-    "Fideos": (TipoItem.alimentos, "kilogramos", "Fideos secos."),
-    "Arroz": (TipoItem.alimentos, "kilogramos", "Arroz."),
-    "Café": (TipoItem.alimentos, "kilogramos", "Café."),
-    "Latas de arvejas": (TipoItem.alimentos, "latas", "Arvejas enlatadas."),
-    "Ambulancias": (TipoItem.maquinaria, "vehículos", "Ambulancias."),
-    "Camiones de carga": (TipoItem.maquinaria, "vehículos", "Camiones de carga."),
-    "Retroexcavadoras": (TipoItem.maquinaria, "vehículos", "Retroexcavadoras."),
-    "Generadores eléctricos": (TipoItem.maquinaria, "unidades", "Generadores eléctricos."),
-    "Tanques de agua": (TipoItem.maquinaria, "unidades", "Tanques de agua."),
+    "Leche en polvo": (TipoItem.alimentos, "kg", "Leche en polvo."),
+    "Yerba": (TipoItem.alimentos, "kg", "Yerba mate."),
+    "Lentejas": (TipoItem.alimentos, "kg", "Lentejas."),
+    "Harina de trigo": (TipoItem.alimentos, "kg", "Harina de trigo."),
+    "Fideos": (TipoItem.alimentos, "kg", "Fideos secos."),
+    "Arroz": (TipoItem.alimentos, "kg", "Arroz."),
+    "Café": (TipoItem.alimentos, "kg", "Café."),
+    "Latas de arvejas": (TipoItem.alimentos, "kg", "Arvejas enlatadas."),
+    "Ambulancias": (TipoItem.maquinaria, "unidades", "Unidades de traslado medicalizado."),
+    "Camiones de carga": (TipoItem.maquinaria, "unidades", "Capacidad mínima 5 toneladas."),
+    "Retroexcavadoras": (TipoItem.maquinaria, "unidades", "Para remoción de escombros."),
+    "Generadores eléctricos": (TipoItem.maquinaria, "unidades", "Generadores portátiles 5 kVA."),
+    "Tanques de agua": (
+        TipoItem.agua,
+        "unidades",
+        "Tanques de 1000 L para distribución comunitaria.",
+    ),
+    "Médicos de urgencia": (
+        TipoItem.personal_medico,
+        "personas",
+        "Médicos con especialidad en emergencias.",
+    ),
+    "Bomberos": (TipoItem.rescate, "personas", "Personal civil de bomberos voluntarios."),
+    "Brigadistas": (
+        TipoItem.rescate,
+        "personas",
+        "Bomberos civiles voluntarios especializados en incendios forestales.",
+    ),
+    "Polenta": (TipoItem.alimentos, "kg", "Polenta."),
+    "Aceite": (TipoItem.alimentos, "raciones", "Aceite."),
+    "Galletitas de agua": (TipoItem.alimentos, "unidades", "Galletitas de agua."),
+    "Galletitas dulces": (TipoItem.alimentos, "unidades", "Galletitas dulces."),
+    "Azúcar": (TipoItem.alimentos, "kg", "Azúcar."),
+    "Ropa de invierno": (
+        TipoItem.abrigo,
+        "unidades",
+        "Donaciones de ropa apta para temperaturas por debajo de los 15°.",
+    ),
+    "Ropa de verano": (
+        TipoItem.abrigo,
+        "unidades",
+        "Donaciones de ropa apta para temperaturas por encima de los 15°.",
+    ),
+    "Paracetamol": (
+        TipoItem.medicamentos,
+        "unidades",
+        "Genérico. Comprimidos de 200, 600, 800 o 1000 mgr.",
+    ),
+    "Ibuprofeno": (
+        TipoItem.medicamentos,
+        "unidades",
+        "Genérico. Comprimidos de 200, 600 o 800 mgr.",
+    ),
+    "Suero fisiológico": (
+        TipoItem.medicamentos,
+        "unidades",
+        "Para reponer líquidos, limpiar ojos, lavar heridas y quemaduras, y diluir medicamentos.",
+    ),
+    "Toallitas femeninas": (TipoItem.otro, "unidades", "Para higiene menstrual."),
+    "Jabón": (TipoItem.otro, "unidades", "Barras de jabón para aseo personal."),
 }
 
 
@@ -129,11 +224,13 @@ def _codigo_recurso(nombre: str) -> str:
 ITEMS_NO_CONSUMIBLES = frozenset(
     {
         "Paramédicos",
+        "Médicos de urgencia",
         "Enfermeros",
         "Rescatistas",
-        "Voluntarios generales",
         "Perros de búsqueda",
-        "Carpas familiares",
+        "Bomberos",
+        "Brigadistas",
+        "Voluntarios generales",
         "Ambulancias",
         "Camiones de carga",
         "Retroexcavadoras",
@@ -229,6 +326,11 @@ def sembrar_organizaciones() -> list[ResultadoSemilla]:
                     motivo=motivo_suspension or MOTIVO_SEMILLA,
                 )
             )
+        # El tipo, en cambio, es dato de referencia: ningun endpoint lo modifica y tiene que
+        # coincidir con la web para que la evaluacion de ofertas acepte a sus ONG.
+        elif organizacion.tipo is not tipo:
+            organizacion.tipo = tipo
+            resultado.actualizados += 1
         resultado.contar(creado)
     return [resultado]
 
@@ -237,18 +339,27 @@ def sembrar_organizaciones() -> list[ResultadoSemilla]:
 def sembrar_items() -> list[ResultadoSemilla]:
     resultado = ResultadoSemilla("items")
     for nombre, (tipo, unidad, descripcion) in ITEMS.items():
+        atributos = {
+            "tipo": tipo,
+            "unidad_medida": unidad,
+            "descripcion": descripcion,
+            "consumible": nombre not in ITEMS_NO_CONSUMIBLES,
+        }
         item, creado = obtener_o_crear(
             Item,
             claves={"nombre": nombre},
-            valores={
-                "codigo_recurso": _codigo_recurso(nombre),
-                "tipo": tipo,
-                "unidad_medida": unidad,
-                "descripcion": descripcion,
-                "consumible": nombre not in ITEMS_NO_CONSUMIBLES,
-            },
+            valores={"codigo_recurso": _codigo_recurso(nombre), **atributos},
         )
-        item.consumible = nombre not in ITEMS_NO_CONSUMIBLES
+        # El catalogo solo lo define este seed (ningun endpoint crea ni edita items): en cada
+        # deploy se corrigen los atributos de los items que ya existian para que la base
+        # compartida siga igual a la web. El codigo no se toca porque sale del nombre.
+        cambios = {
+            campo: valor for campo, valor in atributos.items() if getattr(item, campo) != valor
+        }
+        if not creado and cambios:
+            for campo, valor in cambios.items():
+                setattr(item, campo, valor)
+            resultado.actualizados += 1
         resultado.contar(creado)
     return [resultado]
 
@@ -285,7 +396,7 @@ def sembrar_certificaciones() -> list[ResultadoSemilla]:
 @registrar("inventarios")
 def sembrar_inventarios() -> list[ResultadoSemilla]:
     resultado_inventarios = ResultadoSemilla("inventarios")
-    resultado_items = ResultadoSemilla("inventario_items")
+    resultado_items = ResultadoSemilla("inventario_items", etiqueta_actualizados="repuestos")
     for nombre_org, (_nombre, _descripcion, stock) in INVENTARIOS.items():
         organizacion = Organizacion.query.filter_by(nombre=nombre_org).one()
         inventario, creado = obtener_o_crear(

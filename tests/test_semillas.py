@@ -19,6 +19,7 @@ from app.modulos.organizaciones.modelos import (
     Organizacion,
     OrganizacionCertificacion,
     TipoItem,
+    TipoOrganizacion,
 )
 
 CONTRASENA_ADMIN = "contrasena-admin-de-prueba"
@@ -132,12 +133,14 @@ def test_semillas_clasifican_recursos_consumibles_y_reutilizables(base_de_datos)
     items = {item.nombre: item.consumible for item in db.session.query(Item).all()}
 
     assert items["Paramédicos"] is False
+    assert items["Médicos de urgencia"] is False
     assert items["Enfermeros"] is False
     assert items["Rescatistas"] is False
     assert items["Ambulancias"] is False
     assert items["Generadores eléctricos"] is False
     assert items["Frazadas"] is True
     assert items["Colchones"] is True
+    assert items["Carpas familiares"] is True
     assert items["Tanques de agua"] is True
     assert items["Agua potable envasada"] is True
     assert items["Antibióticos"] is True
@@ -157,6 +160,46 @@ def test_semillas_corrigen_consumible_al_reejecutarse(base_de_datos):
     db.session.commit()
 
     assert db.session.query(Item).filter_by(nombre="Paramédicos").one().consumible is False
+
+
+def test_semillas_corrigen_atributos_del_catalogo_al_reejecutarse(base_de_datos):
+    # Simula un item sembrado con los valores viejos de la API, antes de alinearla con la web.
+    _sembrar()
+    voluntarios = db.session.query(Item).filter_by(nombre="Voluntarios generales").one()
+    codigo = voluntarios.codigo_recurso
+    voluntarios.tipo = TipoItem.personal_medico
+    voluntarios.unidad_medida = "voluntarios"
+    voluntarios.descripcion = "Voluntariado disponible."
+    voluntarios.consumible = True
+    db.session.commit()
+
+    resultados = _sembrar()
+
+    tipo, unidad, descripcion = semillas.ITEMS["Voluntarios generales"]
+    assert voluntarios.tipo is tipo is TipoItem.otro
+    assert voluntarios.unidad_medida == unidad
+    assert voluntarios.descripcion == descripcion
+    assert voluntarios.consumible is False
+    assert voluntarios.codigo_recurso == codigo
+    assert resultados["items"].actualizados == 1
+    assert resultados["items"].creados == 0
+
+
+def test_semillas_corrigen_el_tipo_de_organizacion_sin_tocar_su_estado(base_de_datos):
+    _sembrar()
+    bomberos = (
+        db.session.query(Organizacion).filter_by(identificador_nacional="30-99999999-5").one()
+    )
+    bomberos.tipo = TipoOrganizacion.organismo_rescate
+    bomberos.estado_habilitacion = EstadoHabilitacion.suspendida
+    db.session.commit()
+
+    resultados = _sembrar()
+
+    assert bomberos.tipo is TipoOrganizacion.ong
+    assert bomberos.estado_habilitacion is EstadoHabilitacion.suspendida
+    assert resultados["organizaciones"].actualizados == 1
+    assert _sembrar()["organizaciones"].actualizados == 0
 
 
 def test_comando_flask_seed_carga_los_datos(app):

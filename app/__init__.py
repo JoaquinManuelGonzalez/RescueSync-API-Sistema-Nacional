@@ -77,15 +77,15 @@ def _registrar_comando_seed(app: Flask) -> None:
             with db.session.begin():
                 for seeder in SEEDERS:
                     for resultado in seeder.funcion():
-                        repuestos = (
-                            f", {resultado.actualizados} repuestos"
+                        actualizados = (
+                            f", {resultado.actualizados} {resultado.etiqueta_actualizados}"
                             if resultado.actualizados
                             else ""
                         )
                         click.echo(
                             f"{seeder.nombre}/{resultado.entidad}: "
                             f"{resultado.creados} creados, "
-                            f"{resultado.existentes} existentes{repuestos}"
+                            f"{resultado.existentes} existentes{actualizados}"
                         )
         except Exception:
             db.session.rollback()
