@@ -257,15 +257,26 @@ colección en orden. Los dos logins guardan sus tokens en variables y los demás
 los casos de la épica: 401 sin token o con token adulterado, 403 por rol, alta de una ONG, 409 por
 CUIT duplicado y la ONG suspendida que se vuelve a habilitar.
 
-Datos de demostración del padrón: las mismas organizaciones y CUIT que la aplicación web, todas
-`habilitada` salvo **Cruz Roja Argentina - Filial Bahía Blanca** (`30-99999999-4`), que está
-`suspendida` para mostrar el caso de una ONG que no puede ofertar.
+Datos de demostración del padrón: las mismas organizaciones, CUIT y tipo que la aplicación web
+(Bomberos Voluntarios de La Plata también es ONG), todas `habilitada` salvo
+**Cruz Roja Argentina - Filial Bahía Blanca** (`30-99999999-4`), que está `suspendida` para
+mostrar el caso de una ONG que oferta en la web y el Sistema Nacional rechaza.
+
+El catálogo de recursos son los **mismos 46 ítems que la aplicación web**, con el mismo
+`codigo_recurso`, tipo, unidad y consumible: Bonita reenvía los códigos de la web sin
+traducirlos, y uno que falte acá hace fallar `POST /ofertas/evaluacion` con 404.
+`tests/test_catalogo_compartido.py` compara las semillas con una copia del catálogo que la web
+verifica con la misma prueba; si se agrega o cambia un ítem, se actualizan los dos repos. Las
+certificaciones y los inventarios del Sistema Nacional no son una copia de los de la web, así que
+algunos aportes válidos en la web salen `rechazada` en la evaluación (por ejemplo, los de
+medicamentos, abrigo o agua de Bomberos y de los Scouts, que no tienen esas certificaciones).
 
 Los datos semilla se cargan en cada arranque del contenedor, también en cada deploy de Render.
 Crean lo que falta sin duplicar y **reponen el stock** de los inventarios de demostración: un
 ítem que quedó por debajo de su cantidad semilla vuelve a esa cantidad, uno que está por encima
-no se toca, y los compromisos no se modifican. El estado de habilitación de las organizaciones
-que ya existían tampoco se toca.
+no se toca, y los compromisos no se modifican. También corrigen el tipo, la unidad, la descripción
+y el consumible de los ítems del catálogo y el tipo de las organizaciones, que son datos de
+referencia. El estado de habilitación de las organizaciones que ya existían no se toca.
 
 ## Despliegue en Render
 

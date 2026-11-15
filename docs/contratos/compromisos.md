@@ -17,8 +17,8 @@ contratos de [autenticación](autenticacion.md) y [logging](logging.md).
   "nivel_gravedad": "MEDIA",
   "aportes": [
     {
-      "identificador_nacional": "30-11111111-1",
-      "codigo_recurso": "RSR-AGUA_POTABLE",
+      "identificador_nacional": "30-65432198-7",
+      "codigo_recurso": "RSR-AGUA_POTABLE_ENVASADA",
       "cantidad": 500,
       "tipo_asignacion": "principal"
     }

@@ -58,10 +58,10 @@ EJEMPLO_RECURSOS_DISPONIBLES = {
             "consumible": True,
             "disponible": 100,
             "id": 0,
-            "nombre": "Botellas de agua",
+            "nombre": "Agua potable envasada",
             "tipo": "agua",
             "total": 100,
-            "unidad_medida": "unidades",
+            "unidad_medida": "litros",
         },
         {
             "comprometido": 1,
