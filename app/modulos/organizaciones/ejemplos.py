@@ -1,33 +1,54 @@
+"""Ejemplos de respuestas de Swagger para organizaciones, certificaciones y recursos.
+
+Los ids del catálogo (ítems y certificaciones) son los reales: salen de su clave natural y valen
+en cualquier base. Los de organizaciones y filas de inventario son ilustrativos.
+"""
+
+from app.core.identificadores import id_de_certificacion, id_de_item
+
+CERTIFICACION_SANITARIA = str(
+    id_de_certificacion("Certificación de atención sanitaria", "personal_medico")
+)
+CERTIFICACION_AGUA = str(id_de_certificacion("Certificación de abastecimiento de agua", "agua"))
+CERTIFICACION_ALIMENTOS = str(
+    id_de_certificacion("Certificación de distribución de alimentos", "alimentos")
+)
+CERTIFICACION_RESCATE = str(
+    id_de_certificacion("Certificación de respuesta ante emergencias", "rescate")
+)
+ID_ORGANIZACION = "0193f4a2-7c1e-7b5d-9a3f-2e8c4b6d1a06"
+ID_OTRA_ORGANIZACION = "0193f4a2-7c1e-7b5d-9a3f-2e8c4b6d1a10"
+
 EJEMPLO_ONGS_HABILITADAS = {
     "elementos": [
         {
             "certificaciones": [
                 {
-                    "id": 0,
+                    "id": CERTIFICACION_SANITARIA,
                     "nivel_certificacion": "alta",
                     "nombre": "Certificación de atención sanitaria",
                 },
                 {
-                    "id": 1,
+                    "id": CERTIFICACION_AGUA,
                     "nivel_certificacion": "alta",
                     "nombre": "Certificación de abastecimiento de agua",
                 },
             ],
             "cuit": "30-99999999-7",
-            "id": 6,
+            "id": ID_ORGANIZACION,
             "mail_contacto": "solidaria@rescuesync.ej",
             "nombre": "La Solidaria",
         },
         {
             "certificaciones": [
                 {
-                    "id": 2,
+                    "id": CERTIFICACION_ALIMENTOS,
                     "nivel_certificacion": "alta",
                     "nombre": "Certificación de distribución de alimentos",
                 },
             ],
             "cuit": "30-88888888-6",
-            "id": 10,
+            "id": ID_OTRA_ORGANIZACION,
             "mail_contacto": "federada@rescuesync.ej",
             "nombre": "La Federada",
         },
@@ -39,10 +60,14 @@ EJEMPLO_ONGS_HABILITADAS = {
 
 EJEMPLO_CATALOGO_CERTIFICACIONES = {
     "elementos": [
-        {"id": 0, "nombre": "Certificación de abastecimiento de agua", "tipo": "agua"},
         {
-            "id": 1,
-            "nombre": "Habilitación nacional para el transporte de productos alimenticios",
+            "id": CERTIFICACION_AGUA,
+            "nombre": "Certificación de abastecimiento de agua",
+            "tipo": "agua",
+        },
+        {
+            "id": CERTIFICACION_ALIMENTOS,
+            "nombre": "Certificación de distribución de alimentos",
             "tipo": "alimentos",
         },
     ],
@@ -57,7 +82,7 @@ EJEMPLO_RECURSOS_DISPONIBLES = {
             "comprometido": 1,
             "consumible": False,
             "disponible": 19,
-            "id": 1,
+            "id": str(id_de_item("RSR-ENFERMEROS")),
             "nombre": "Enfermeros",
             "tipo": "personal_medico",
             "total": 20,
@@ -67,7 +92,7 @@ EJEMPLO_RECURSOS_DISPONIBLES = {
             "comprometido": 21,
             "consumible": False,
             "disponible": 19,
-            "id": 5,
+            "id": str(id_de_item("RSR-VOLUNTARIOS_GENERALES")),
             "nombre": "Voluntarios generales",
             "tipo": "otro",
             "total": 40,
@@ -85,7 +110,7 @@ EJEMPLO_DISPONIBILIDAD_ONG = {
             "comprometido": 0,
             "consumible": False,
             "disponible": 10,
-            "id": 2,
+            "id": str(id_de_item("RSR-PARAMEDICOS")),
             "nombre": "Paramédicos",
             "tipo": "personal_medico",
             "total": 10,
@@ -98,24 +123,24 @@ EJEMPLO_DISPONIBILIDAD_ONG = {
 }
 
 EJEMPLO_CARGA_DE_INVENTARIO = {
-    "cantidad_disponible": 1,
-    "id": 29,
-    "item_id": 13,
-    "item_nombre": "Pañales para adulto",
+    "cantidad_disponible": 5,
+    "id": "0193f4a2-7c1e-7b5d-9a3f-2e8c4b6d1a29",
+    "item_id": str(id_de_item("RSR-GENERADORES_ELECTRICOS")),
+    "item_nombre": "Generadores eléctricos",
 }
 
 EJEMPLO_CARGA_DE_CERTIFICACION = {
-    "certificacion_id": 6,
+    "certificacion_id": CERTIFICACION_RESCATE,
     "certificacion_nombre": "Certificación de respuesta ante emergencias",
     "fecha_emision": "2026-10-26T20:00:00.000+00:00",
-    "id": 14,
-    "nivel_certificacion": "baja",
+    "id": "0193f4a2-7c1e-7b5d-9a3f-2e8c4b6d1a14",
+    "nivel_certificacion": "alta",
 }
 
 EJEMPLO_ERROR_400_CAMPOS_INVALIDOS = {
     "error": {
         "codigo": "SOLICITUD_INVALIDA",
-        "detalle": {"query": {"certificacion_id": ["Debe ser un número entero."]}},
+        "detalle": {"query": {"certificacion_id": ["Debe ser un UUID válido."]}},
         "id_correlacion": "e7e3910...",
         "mensaje": "La solicitud tiene campos inválidos o incompletos.",
         "timestamp": "2026-10-26T20:00:00.000Z",
@@ -146,7 +171,10 @@ EJEMPLO_ERROR_400_CUIT = {
 EJEMPLO_ERROR_409_ITEM = {
     "error": {
         "codigo": "CONFLICTO_DE_ESTADO",
-        "detalle": {"cuit": "30-99999999-7", "item_id": 0},
+        "detalle": {
+            "cuit": "30-99999999-7",
+            "item_id": str(id_de_item("RSR-GENERADORES_ELECTRICOS")),
+        },
         "id_correlacion": "e7e3910...",
         "mensaje": "La organización ya tiene cargado ese ítem.",
         "timestamp": "2026-10-26T20:00:00.000Z",
@@ -156,7 +184,7 @@ EJEMPLO_ERROR_409_ITEM = {
 EJEMPLO_ERROR_409_CERTIFICACION = {
     "error": {
         "codigo": "CONFLICTO_DE_ESTADO",
-        "detalle": {"certificacion_id": 0, "cuit": "30-99999999-7"},
+        "detalle": {"certificacion_id": CERTIFICACION_RESCATE, "cuit": "30-99999999-7"},
         "id_correlacion": "e7e3910...",
         "mensaje": "La organización ya tiene cargada esa certificación.",
         "timestamp": "2026-10-26T20:00:00.000Z",
@@ -165,7 +193,7 @@ EJEMPLO_ERROR_409_CERTIFICACION = {
 
 
 EJEMPLO_ALTA_ONG = {
-    "id": 0,
+    "id": ID_ORGANIZACION,
     "cuit": "30-71555444-2",
     "nombre": "Red Solidaria Chascomús",
     "tipo": "ong",
@@ -196,7 +224,7 @@ EJEMPLO_HABILITACION_ONG = {
     "cuit": "30-99999999-5",
     "estado_habilitacion": "habilitada",
     "habilitada": True,
-    "id": 0,
+    "id": ID_ORGANIZACION,
     "mail_contacto": "ongsolidaria@rescuesync.ej",
     "motivo_estado": "Estado inicial del padrón (datos de demostración).",
     "nombre": "La Solidaria",
@@ -223,7 +251,7 @@ EJEMPLO_CAMBIO_HABILITACION = {
     "cuit": "30-99999999-7",
     "estado_habilitacion": "suspendida",
     "habilitada": False,
-    "id": 0,
+    "id": ID_ORGANIZACION,
     "mail_contacto": "ongsolidaria@rescuesync.ej",
     "motivo_estado": "Certificación sanitaria vencida.",
     "nombre": "La Solidaria",

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 
 from app.core.acceso import Rol
@@ -221,11 +223,12 @@ def test_administrador_carga_item_y_cantidad_al_inventario(cliente, cabeceras, o
 
     respuesta = cliente.post(
         "/ongs/30-65432198-7/inventario",
-        json={"item_id": item.id, "cantidad_disponible": 750},
+        json={"item_id": str(item.id), "cantidad_disponible": 750},
         headers=cabeceras(Rol.administrador),
     )
 
     assert respuesta.status_code == 201
+    assert respuesta.get_json()["item_id"] == str(item.id)
     assert respuesta.get_json()["item_nombre"] == "Agua potable"
     assert respuesta.get_json()["cantidad_disponible"] == 750
 
@@ -237,7 +240,7 @@ def test_administrador_carga_certificacion_y_nivel(cliente, cabeceras, organizac
 
     respuesta = cliente.post(
         "/ongs/30-65432198-7/certificaciones",
-        json={"certificacion_id": certificacion.id, "nivel_certificacion": "alta"},
+        json={"certificacion_id": str(certificacion.id), "nivel_certificacion": "alta"},
         headers=cabeceras(Rol.administrador),
     )
 
@@ -250,7 +253,7 @@ def test_administrador_carga_certificacion_y_nivel(cliente, cabeceras, organizac
 def test_carga_certificacion_rechaza_nivel_invalido(cliente, cabeceras, organizacion):
     respuesta = cliente.post(
         "/ongs/30-65432198-7/certificaciones",
-        json={"certificacion_id": 1, "nivel_certificacion": "ALTO"},
+        json={"certificacion_id": str(uuid.uuid7()), "nivel_certificacion": "ALTO"},
         headers=cabeceras(),
     )
 
@@ -260,8 +263,33 @@ def test_carga_certificacion_rechaza_nivel_invalido(cliente, cabeceras, organiza
 def test_bonita_no_puede_cargar_inventario(cliente, cabeceras, organizacion):
     respuesta = cliente.post(
         "/ongs/30-65432198-7/inventario",
-        json={"item_id": 1, "cantidad_disponible": 1},
+        json={"item_id": str(uuid.uuid7()), "cantidad_disponible": 1},
         headers=cabeceras(Rol.sistema),
     )
 
     assert respuesta.status_code == 403
+
+
+def test_carga_de_inventario_rechaza_un_item_id_que_no_es_uuid(cliente, cabeceras, organizacion):
+    respuesta = cliente.post(
+        "/ongs/30-65432198-7/inventario",
+        json={"item_id": 30, "cantidad_disponible": 1},
+        headers=cabeceras(Rol.administrador),
+    )
+
+    assert respuesta.status_code == 400
+    assert respuesta.get_json()["error"]["detalle"] == {
+        "json": {"item_id": ["Debe ser un UUID válido."]}
+    }
+
+
+def test_carga_de_inventario_con_un_item_inexistente_responde_404(cliente, cabeceras, organizacion):
+    item_id = str(uuid.uuid7())
+    respuesta = cliente.post(
+        "/ongs/30-65432198-7/inventario",
+        json={"item_id": item_id, "cantidad_disponible": 1},
+        headers=cabeceras(Rol.administrador),
+    )
+
+    assert respuesta.status_code == 404
+    assert respuesta.get_json()["error"]["detalle"] == {"item_id": item_id}

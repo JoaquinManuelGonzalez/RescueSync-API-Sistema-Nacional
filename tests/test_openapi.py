@@ -60,7 +60,7 @@ def test_documenta_evaluacion_de_ofertas(especificacion):
     request_body = operacion["requestBody"]["content"]["application/json"]
     assert "example" in request_body
     assert "examples" not in request_body
-    assert request_body["example"]["emergencia_id"] == 14
+    assert request_body["example"]["emergencia_id"] == "0193f4a2-7c1e-7e00-9e00-000000000014"
     respuestas = operacion["responses"]["200"]["content"]["application/json"]["examples"]
     assert set(respuestas) == {
         "ok_principal_y_apoyo",

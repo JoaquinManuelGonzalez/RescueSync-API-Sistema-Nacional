@@ -8,6 +8,7 @@ identifican a una organización por su CUIT (`identificador_nacional`), no por s
 from __future__ import annotations
 
 import re
+import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
@@ -182,21 +183,21 @@ def cambiar_estado_habilitacion(
     return organizacion
 
 
-def cargar_item(cuit: str, item_id: int, cantidad_disponible: int) -> InventarioItem:
+def cargar_item(cuit: str, item_id: uuid.UUID, cantidad_disponible: int) -> InventarioItem:
     """Agrega un ítem al inventario de una organización."""
     organizacion = obtener_por_cuit(cuit)
     item = db.session.get(Item, item_id)
     if item is None:
         raise RecursoNoEncontrado(
             "No hay ningún ítem con ese identificador.",
-            detalle={"item_id": item_id},
+            detalle={"item_id": str(item_id)},
         )
     if organizacion.inventario is None:
         organizacion.inventario = Inventario()
     if any(registro.item_id == item_id for registro in organizacion.inventario.items):
         raise ConflictoDeEstado(
             "La organización ya tiene cargado ese ítem.",
-            detalle={"item_id": item_id, "cuit": organizacion.identificador_nacional},
+            detalle={"item_id": str(item_id), "cuit": organizacion.identificador_nacional},
         )
     registro = InventarioItem(item=item, cantidad_disponible=cantidad_disponible)
     organizacion.inventario.items.append(registro)
@@ -205,7 +206,7 @@ def cargar_item(cuit: str, item_id: int, cantidad_disponible: int) -> Inventario
 
 
 def cargar_certificacion(
-    cuit: str, certificacion_id: int, nivel_certificacion: NivelCertificacion
+    cuit: str, certificacion_id: uuid.UUID, nivel_certificacion: NivelCertificacion
 ) -> OrganizacionCertificacion:
     """Asigna una certificación a una organización con su nivel."""
     organizacion = obtener_por_cuit(cuit)
@@ -213,7 +214,7 @@ def cargar_certificacion(
     if certificacion is None:
         raise RecursoNoEncontrado(
             "No hay ninguna certificación con ese identificador.",
-            detalle={"certificacion_id": certificacion_id},
+            detalle={"certificacion_id": str(certificacion_id)},
         )
     if any(
         asignacion.certificacion_id == certificacion_id
@@ -222,7 +223,7 @@ def cargar_certificacion(
         raise ConflictoDeEstado(
             "La organización ya tiene cargada esa certificación.",
             detalle={
-                "certificacion_id": certificacion_id,
+                "certificacion_id": str(certificacion_id),
                 "cuit": organizacion.identificador_nacional,
             },
         )

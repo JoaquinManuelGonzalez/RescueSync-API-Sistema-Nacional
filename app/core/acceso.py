@@ -26,6 +26,7 @@ cuenta misma.
 from __future__ import annotations
 
 import enum
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import wraps
@@ -80,7 +81,7 @@ class Actor:
     cuenta: str
     rol: Rol
     # Id de la cuenta en la base, para las claves foraneas de los historiales.
-    cuenta_id: int | None = None
+    cuenta_id: uuid.UUID | None = None
     usuario_bonita: str | None = None
     caso_bonita: str | None = None
 

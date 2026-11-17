@@ -6,6 +6,7 @@ import re
 import unicodedata
 from datetime import UTC, datetime
 
+from app.core.identificadores import id_de_certificacion, id_de_item
 from app.core.semillas import ResultadoSemilla, obtener_o_crear, registrar
 from app.modulos.organizaciones.modelos import (
     Certificacion,
@@ -345,10 +346,12 @@ def sembrar_items() -> list[ResultadoSemilla]:
             "descripcion": descripcion,
             "consumible": nombre not in ITEMS_NO_CONSUMIBLES,
         }
+        codigo = _codigo_recurso(nombre)
+        # El id sale del código: el mismo recurso tiene el mismo id en todas las bases.
         item, creado = obtener_o_crear(
             Item,
             claves={"nombre": nombre},
-            valores={"codigo_recurso": _codigo_recurso(nombre), **atributos},
+            valores={"id": id_de_item(codigo), "codigo_recurso": codigo, **atributos},
         )
         # El catalogo solo lo define este seed (ningun endpoint crea ni edita items): en cada
         # deploy se corrigen los atributos de los items que ya existian para que la base
@@ -373,6 +376,7 @@ def sembrar_certificaciones() -> list[ResultadoSemilla]:
             certificacion, creada = obtener_o_crear(
                 Certificacion,
                 claves={"nombre": nombre, "tipo": tipo},
+                valores={"id": id_de_certificacion(nombre, tipo.value)},
             )
             asignacion, asignada = obtener_o_crear(
                 OrganizacionCertificacion,

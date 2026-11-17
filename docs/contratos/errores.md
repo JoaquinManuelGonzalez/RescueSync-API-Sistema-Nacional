@@ -21,7 +21,7 @@ Todo error, sin excepción, se devuelve con esta estructura JSON:
   "error": {
     "codigo": "REGLA_DE_NEGOCIO_INCUMPLIDA",
     "mensaje": "La ONG no está habilitada para el tipo de recurso ofrecido.",
-    "detalle": {"ong_id": 7, "tipo_recurso": "agua_potable"},
+    "detalle": {"identificador_nacional": "30-65432198-7", "tipo_recurso": "agua_potable"},
     "timestamp": "2026-10-05T18:04:11.482Z",
     "id_correlacion": "8f3a1c22-5d6e-4f19-a0b1-2c3d4e5f6a7b"
   }

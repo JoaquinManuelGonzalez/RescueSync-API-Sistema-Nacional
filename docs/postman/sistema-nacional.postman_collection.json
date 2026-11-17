@@ -648,7 +648,7 @@
                   "  pm.response.json().elementos.forEach((organizacion) => {",
                   "    pm.expect(organizacion).to.have.property(\"cuit\");",
                   "    pm.expect(organizacion).to.have.property(\"certificaciones\");",
-                  "    pm.expect(organizacion.id).to.be.a(\"number\");",
+                  "    pm.expect(organizacion.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);",
                   "  });",
                   "});"
                 ]
@@ -1457,7 +1457,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"item_id\": {{itemId}},\n  \"cantidad_disponible\": 100\n}",
+              "raw": "{\n  \"item_id\": \"{{itemId}}\",\n  \"cantidad_disponible\": 100\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1474,7 +1474,7 @@
                   "pm.test(\"Responde 201 con el ítem cargado\", () => {",
                   "  pm.response.to.have.status(201);",
                   "  const cuerpo = pm.response.json();",
-                  "  pm.expect(cuerpo.item_id).to.eql(Number(pm.collectionVariables.get(\"itemId\")));",
+                  "  pm.expect(cuerpo.item_id).to.eql(pm.collectionVariables.get(\"itemId\"));",
                   "  pm.expect(cuerpo.cantidad_disponible).to.eql(100);",
                   "});"
                 ]
@@ -1516,7 +1516,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"certificacion_id\": {{certificacionId}},\n  \"nivel_certificacion\": \"alta\"\n}",
+              "raw": "{\n  \"certificacion_id\": \"{{certificacionId}}\",\n  \"nivel_certificacion\": \"alta\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1533,7 +1533,7 @@
                   "pm.test(\"Responde 201 con la certificación cargada\", () => {",
                   "  pm.response.to.have.status(201);",
                   "  const cuerpo = pm.response.json();",
-                  "  pm.expect(cuerpo.certificacion_id).to.eql(Number(pm.collectionVariables.get(\"certificacionId\")));",
+                  "  pm.expect(cuerpo.certificacion_id).to.eql(pm.collectionVariables.get(\"certificacionId\"));",
                   "  pm.expect(cuerpo.nivel_certificacion).to.eql(\"alta\");",
                   "});"
                 ]
@@ -1575,7 +1575,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"certificacion_id\": {{certificacionId}},\n  \"nivel_certificacion\": \"ALTO\"\n}",
+              "raw": "{\n  \"certificacion_id\": \"{{certificacionId}}\",\n  \"nivel_certificacion\": \"ALTO\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1649,7 +1649,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const idDinamico = 'emergencia-postman-' + Date.now();",
+                  "const idDinamico = pm.variables.replaceIn('{{$guid}}');",
                   "pm.collectionVariables.set('emergenciaPostmanId', idDinamico);"
                 ]
               }
@@ -1703,7 +1703,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"emergencia_externa_id\": \"emergencia-postman-01\",\n  \"nivel_gravedad\": \"ALTA\",\n  \"aportes\": [\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n      \"cantidad\": 3,\n      \"tipo_asignacion\": \"principal\"\n    },\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-AGUA_POTABLE_ENVASADA\",\n      \"cantidad\": 99999,\n      \"tipo_asignacion\": \"apoyo\"\n    }\n  ]\n}",
+              "raw": "{\n  \"emergencia_externa_id\": \"{{$guid}}\",\n  \"nivel_gravedad\": \"ALTA\",\n  \"aportes\": [\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n      \"cantidad\": 3,\n      \"tipo_asignacion\": \"principal\"\n    },\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-AGUA_POTABLE_ENVASADA\",\n      \"cantidad\": 99999,\n      \"tipo_asignacion\": \"apoyo\"\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1758,7 +1758,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"emergencia_externa_id\": \"emergencia-postman-02\",\n  \"nivel_gravedad\": \"MEDIA\",\n  \"aportes\": [\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n      \"cantidad\": 999,\n      \"tipo_asignacion\": \"principal\"\n    }\n  ]\n}",
+              "raw": "{\n  \"emergencia_externa_id\": \"{{$guid}}\",\n  \"nivel_gravedad\": \"MEDIA\",\n  \"aportes\": [\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n      \"cantidad\": 999,\n      \"tipo_asignacion\": \"principal\"\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1811,7 +1811,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"emergencia_externa_id\": \"emergencia-postman-03\",\n  \"nivel_gravedad\": \"CRITICA\",\n  \"aportes\": [\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-AGUA_POTABLE_ENVASADA\",\n      \"cantidad\": 9999999,\n      \"tipo_asignacion\": \"apoyo\"\n    }\n  ]\n}",
+              "raw": "{\n  \"emergencia_externa_id\": \"{{$guid}}\",\n  \"nivel_gravedad\": \"CRITICA\",\n  \"aportes\": [\n    {\n      \"identificador_nacional\": \"30-65432198-7\",\n      \"codigo_recurso\": \"RSR-AGUA_POTABLE_ENVASADA\",\n      \"cantidad\": 9999999,\n      \"tipo_asignacion\": \"apoyo\"\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2038,8 +2038,8 @@
                   "const baseUrl = pm.environment.get(\"baseUrl\") || \"http://localhost:8000\";",
                   "const token = pm.collectionVariables.get(\"tokenBonita\");",
                   "const ts = Date.now();",
-                  "const emA = \"emergencia-concurrente-A-\" + ts;",
-                  "const emB = \"emergencia-concurrente-B-\" + ts;",
+                  "const emA = pm.variables.replaceIn(\"{{$guid}}\");",
+                  "const emB = pm.variables.replaceIn(\"{{$guid}}\");",
                   "",
                   "const pedido1 = {",
                   "  url: baseUrl + \"/recursos/compromisos\",",
@@ -2166,7 +2166,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"emergencia_id\": 14,\n  \"nivel_gravedad\": \"ALTA\",\n  \"ofertas\": [\n    {\n      \"fecha_creacion\": \"2026-10-16T14:40:44Z\",\n      \"items\": [\n        {\n          \"aportes\": [\n            {\n              \"cantidad\": 2,\n              \"identificador_nacional\": \"30-65432198-7\",\n              \"organizacion_id\": 6\n            }\n          ],\n          \"cantidad_total\": 2,\n          \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n          \"lote_item_id\": 10,\n          \"tipo_recurso\": \"personal_medico\",\n          \"unidad\": \"personas\"\n        },\n        {\n          \"aportes\": [\n            {\n              \"cantidad\": 2,\n              \"identificador_nacional\": \"30-65432199-5\",\n              \"organizacion_id\": 7\n            }\n          ],\n          \"cantidad_total\": 2,\n          \"codigo_recurso\": \"RSR-FRAZADAS\",\n          \"lote_item_id\": 11,\n          \"tipo_recurso\": \"abrigo\",\n          \"unidad\": \"unidades\"\n        }\n      ],\n      \"oferta_id\": 7,\n      \"organizaciones\": [\n        {\n          \"id\": 6,\n          \"identificador_nacional\": \"30-65432198-7\",\n          \"nombre\": \"Cruz Solidaria\",\n          \"rol\": \"aportante\"\n        },\n        {\n          \"id\": 7,\n          \"identificador_nacional\": \"30-65432199-5\",\n          \"nombre\": \"Manos Unidas\",\n          \"rol\": \"aportante\"\n        }\n      ],\n      \"version\": 2\n    }\n  ]\n}",
+              "raw": "{\n  \"emergencia_id\": \"0193f4a2-7c1e-7e00-9e00-000000000014\",\n  \"nivel_gravedad\": \"ALTA\",\n  \"ofertas\": [\n    {\n      \"fecha_creacion\": \"2026-10-16T14:40:44Z\",\n      \"items\": [\n        {\n          \"aportes\": [\n            {\n              \"cantidad\": 2,\n              \"identificador_nacional\": \"30-65432198-7\",\n              \"organizacion_id\": \"0193f4a2-7c1e-7c00-9c00-000000000006\"\n            }\n          ],\n          \"cantidad_total\": 2,\n          \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n          \"lote_item_id\": \"0193f4a2-7c1e-7a00-9a00-000000000010\",\n          \"tipo_recurso\": \"personal_medico\",\n          \"unidad\": \"personas\"\n        },\n        {\n          \"aportes\": [\n            {\n              \"cantidad\": 2,\n              \"identificador_nacional\": \"30-65432199-5\",\n              \"organizacion_id\": \"0193f4a2-7c1e-7c00-9c00-000000000007\"\n            }\n          ],\n          \"cantidad_total\": 2,\n          \"codigo_recurso\": \"RSR-FRAZADAS\",\n          \"lote_item_id\": \"0193f4a2-7c1e-7a00-9a00-000000000011\",\n          \"tipo_recurso\": \"abrigo\",\n          \"unidad\": \"unidades\"\n        }\n      ],\n      \"oferta_id\": \"0193f4a2-7c1e-7f00-9f00-000000000007\",\n      \"organizaciones\": [\n        {\n          \"id\": \"0193f4a2-7c1e-7c00-9c00-000000000006\",\n          \"identificador_nacional\": \"30-65432198-7\",\n          \"nombre\": \"Cruz Solidaria\",\n          \"rol\": \"aportante\"\n        },\n        {\n          \"id\": \"0193f4a2-7c1e-7c00-9c00-000000000007\",\n          \"identificador_nacional\": \"30-65432199-5\",\n          \"nombre\": \"Manos Unidas\",\n          \"rol\": \"aportante\"\n        }\n      ],\n      \"version\": 2\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2226,7 +2226,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"emergencia_id\": 15,\n  \"nivel_gravedad\": \"ALTA\",\n  \"ofertas\": [\n    {\n      \"fecha_creacion\": \"2026-10-20T12:00:00Z\",\n      \"items\": [\n        {\n          \"aportes\": [\n            {\n              \"cantidad\": 1,\n              \"identificador_nacional\": \"30-00000000-0\",\n              \"organizacion_id\": 999\n            }\n          ],\n          \"cantidad_total\": 1,\n          \"codigo_recurso\": \"RSR-ENFERMEROS\",\n          \"lote_item_id\": 11,\n          \"tipo_recurso\": \"personal_medico\",\n          \"unidad\": \"personas\"\n        }\n      ],\n      \"oferta_id\": 8,\n      \"organizaciones\": [\n        {\n          \"id\": 6,\n          \"identificador_nacional\": \"30-65432198-7\",\n          \"nombre\": \"Cruz Solidaria\",\n          \"rol\": \"aportante\"\n        }\n      ],\n      \"version\": 1\n    }\n  ]\n}",
+              "raw": "{\n  \"emergencia_id\": \"0193f4a2-7c1e-7e00-9e00-000000000015\",\n  \"nivel_gravedad\": \"ALTA\",\n  \"ofertas\": [\n    {\n      \"fecha_creacion\": \"2026-10-20T12:00:00Z\",\n      \"items\": [\n        {\n          \"aportes\": [\n            {\n              \"cantidad\": 1,\n              \"identificador_nacional\": \"30-00000000-0\",\n              \"organizacion_id\": \"0193f4a2-7c1e-7c00-9c00-000000000999\"\n            }\n          ],\n          \"cantidad_total\": 1,\n          \"codigo_recurso\": \"RSR-ENFERMEROS\",\n          \"lote_item_id\": \"0193f4a2-7c1e-7a00-9a00-000000000011\",\n          \"tipo_recurso\": \"personal_medico\",\n          \"unidad\": \"personas\"\n        }\n      ],\n      \"oferta_id\": \"0193f4a2-7c1e-7f00-9f00-000000000008\",\n      \"organizaciones\": [\n        {\n          \"id\": \"0193f4a2-7c1e-7c00-9c00-000000000006\",\n          \"identificador_nacional\": \"30-65432198-7\",\n          \"nombre\": \"Cruz Solidaria\",\n          \"rol\": \"aportante\"\n        }\n      ],\n      \"version\": 1\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2283,7 +2283,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"emergencia_id\": 16,\n  \"nivel_gravedad\": \"ALTA\",\n  \"ofertas\": [\n    {\n      \"fecha_creacion\": \"2026-10-20T17:00:00Z\",\n      \"items\": [\n        {\n          \"aportes\": [\n            {\n              \"cantidad\": 11,\n              \"identificador_nacional\": \"30-65432198-7\",\n              \"organizacion_id\": 6\n            }\n          ],\n          \"cantidad_total\": 11,\n          \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n          \"lote_item_id\": 12,\n          \"tipo_recurso\": \"personal_medico\",\n          \"unidad\": \"personas\"\n        }\n      ],\n      \"oferta_id\": 9,\n      \"organizaciones\": [\n        {\n          \"id\": 6,\n          \"identificador_nacional\": \"30-65432198-7\",\n          \"nombre\": \"Cruz Solidaria\",\n          \"rol\": \"aportante\"\n        }\n      ],\n      \"version\": 1\n    }\n  ]\n}",
+              "raw": "{\n  \"emergencia_id\": \"0193f4a2-7c1e-7e00-9e00-000000000016\",\n  \"nivel_gravedad\": \"ALTA\",\n  \"ofertas\": [\n    {\n      \"fecha_creacion\": \"2026-10-20T17:00:00Z\",\n      \"items\": [\n        {\n          \"aportes\": [\n            {\n              \"cantidad\": 11,\n              \"identificador_nacional\": \"30-65432198-7\",\n              \"organizacion_id\": \"0193f4a2-7c1e-7c00-9c00-000000000006\"\n            }\n          ],\n          \"cantidad_total\": 11,\n          \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n          \"lote_item_id\": \"0193f4a2-7c1e-7a00-9a00-000000000012\",\n          \"tipo_recurso\": \"personal_medico\",\n          \"unidad\": \"personas\"\n        }\n      ],\n      \"oferta_id\": \"0193f4a2-7c1e-7f00-9f00-000000000009\",\n      \"organizaciones\": [\n        {\n          \"id\": \"0193f4a2-7c1e-7c00-9c00-000000000006\",\n          \"identificador_nacional\": \"30-65432198-7\",\n          \"nombre\": \"Cruz Solidaria\",\n          \"rol\": \"aportante\"\n        }\n      ],\n      \"version\": 1\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2341,7 +2341,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"emergencia_id\": 17,\n  \"nivel_gravedad\": \"ALTA\",\n  \"ofertas\": [\n    {\n      \"fecha_creacion\": \"2026-10-20T17:00:00Z\",\n      \"items\": [\n        {\n          \"aportes\": [\n            {\n              \"cantidad\": 1,\n              \"identificador_nacional\": \"30-65432198-7\",\n              \"organizacion_id\": 6\n            }\n          ],\n          \"cantidad_total\": 1,\n          \"codigo_recurso\": \"RSR-FRAZADAS\",\n          \"lote_item_id\": 13,\n          \"tipo_recurso\": \"abrigo\",\n          \"unidad\": \"unidades\"\n        }\n      ],\n      \"oferta_id\": 10,\n      \"organizaciones\": [\n        {\n          \"id\": 6,\n          \"identificador_nacional\": \"30-65432198-7\",\n          \"nombre\": \"Cruz Solidaria\",\n          \"rol\": \"aportante\"\n        }\n      ],\n      \"version\": 1\n    }\n  ]\n}",
+              "raw": "{\n  \"emergencia_id\": \"0193f4a2-7c1e-7e00-9e00-000000000017\",\n  \"nivel_gravedad\": \"ALTA\",\n  \"ofertas\": [\n    {\n      \"fecha_creacion\": \"2026-10-20T17:00:00Z\",\n      \"items\": [\n        {\n          \"aportes\": [\n            {\n              \"cantidad\": 1,\n              \"identificador_nacional\": \"30-65432198-7\",\n              \"organizacion_id\": \"0193f4a2-7c1e-7c00-9c00-000000000006\"\n            }\n          ],\n          \"cantidad_total\": 1,\n          \"codigo_recurso\": \"RSR-FRAZADAS\",\n          \"lote_item_id\": \"0193f4a2-7c1e-7a00-9a00-000000000013\",\n          \"tipo_recurso\": \"abrigo\",\n          \"unidad\": \"unidades\"\n        }\n      ],\n      \"oferta_id\": \"0193f4a2-7c1e-7f00-9f00-000000000010\",\n      \"organizaciones\": [\n        {\n          \"id\": \"0193f4a2-7c1e-7c00-9c00-000000000006\",\n          \"identificador_nacional\": \"30-65432198-7\",\n          \"nombre\": \"Cruz Solidaria\",\n          \"rol\": \"aportante\"\n        }\n      ],\n      \"version\": 1\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"

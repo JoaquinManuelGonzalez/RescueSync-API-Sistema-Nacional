@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 
 from app.core.acceso import Blueprint, Rol
 from app.core.errores import RespuestaError
+from app.core.identificadores import id_de_certificacion, id_de_item
 from app.extensiones import db
 from app.modulos.compromisos.modelos import Compromiso, CompromisoItem, EstadoCompromiso
 from app.modulos.organizaciones import servicios
@@ -368,7 +369,11 @@ class DisponibilidadDeOrganizacion(MethodView):
 class CargaDeInventario(MethodView):
     @blueprint_organizaciones.requiere_rol(Rol.administrador)
     @blueprint_organizaciones.arguments(
-        PeticionCargaInventarioSchema, example={"item_id": 30, "cantidad_disponible": 5}
+        PeticionCargaInventarioSchema,
+        example={
+            "item_id": str(id_de_item("RSR-GENERADORES_ELECTRICOS")),
+            "cantidad_disponible": 5,
+        },
     )
     @blueprint_organizaciones.response(
         201,
@@ -410,7 +415,12 @@ class CargaDeCertificacion(MethodView):
     @blueprint_organizaciones.requiere_rol(Rol.administrador)
     @blueprint_organizaciones.arguments(
         PeticionCargaCertificacionSchema,
-        example={"certificacion_id": 6, "nivel_certificacion": "alta"},
+        example={
+            "certificacion_id": str(
+                id_de_certificacion("Certificación de respuesta ante emergencias", "rescate")
+            ),
+            "nivel_certificacion": "alta",
+        },
     )
     @blueprint_organizaciones.response(
         201,

@@ -13,7 +13,7 @@ contratos de [autenticación](autenticacion.md) y [logging](logging.md).
 
 ```json
 {
-  "emergencia_externa_id": "emergencia-2026-0042",
+  "emergencia_externa_id": "0193f4a2-7c1e-7b5d-9a3f-2e8c4b6d1a01",
   "nivel_gravedad": "MEDIA",
   "aportes": [
     {
@@ -26,7 +26,11 @@ contratos de [autenticación](autenticacion.md) y [logging](logging.md).
 }
 ```
 
-- `emergencia_externa_id`: identificador opaco compartido con el proceso, hasta 255 caracteres.
+- `emergencia_externa_id`: UUID de la emergencia en la aplicación web, que Bonita reenvía. Tiene
+  que ser un UUID porque es la clave de los compromisos y varias webs usan la misma API: un id
+  entero (la emergencia `1` de cada entorno) pisaría los compromisos de otro. Otro formato
+  responde 400. Se guarda en forma canónica (minúsculas y con guiones), así que mandarlo en
+  mayúsculas da lo mismo.
 - `nivel_gravedad`: `BAJA`, `MEDIA`, `ALTA` o `CRITICA`. También se aceptan las variantes
   internas `BAJO`, `MEDIO`, `ALTO` y `CRITICO`.
 - `aportes`: uno o más recursos ya seleccionados. Cada uno identifica la ONG por su identificador
@@ -43,7 +47,7 @@ indica si se reutilizó el resultado anterior.
 
 ```json
 {
-  "emergencia_externa_id": "emergencia-2026-0042",
+  "emergencia_externa_id": "0193f4a2-7c1e-7b5d-9a3f-2e8c4b6d1a01",
   "repetido": false,
   "compromisos": [
     {
@@ -82,6 +86,9 @@ convocatoria, una nueva solicitud puede registrar los aportes de la nueva vuelta
 cambiaron las organizaciones o cantidades. Los compromisos liberados existentes se reutilizan;
 una emergencia finalizada globalmente no admite nuevos compromisos.
 
+En los endpoints que siguen, `{emergencia_externa_id}` también es un UUID: con otro formato la
+ruta no existe y la API responde 404.
+
 ## `POST /recursos/compromisos/{emergencia_externa_id}/liberacion`
 
 Requiere rol `sistema`. No necesita cuerpo. Libera todos los compromisos de la emergencia
@@ -106,13 +113,27 @@ asegurarse de que no quede nada reservado, y el conector de Bonita falla ante cu
 ## `POST /recursos/compromisos/{emergencia_externa_id}/ongs/{identificador_nacional}/liberacion`
 
 Requiere rol `sistema`. No necesita cuerpo. Libera todos los recursos comprometidos por una ONG
-para una emergencia. Se usa cuando se descarta la oferta de esa ONG; en un consorcio el proceso
-invoca este endpoint una vez por cada organización participante. Los recursos no consumibles
-vuelven al inventario y los consumibles permanecen descontados. `{identificador_nacional}` es el
-CUIT de la ONG, con o sin guiones (`30-65432198-7` o `30654321987`).
+para una emergencia. Los recursos no consumibles vuelven al inventario y los consumibles
+permanecen descontados. `{identificador_nacional}` es el CUIT de la ONG, con o sin guiones
+(`30-65432198-7` o `30654321987`).
+
+La liberación es **por ONG, no por ítem**: abarca todo lo que la evaluación le comprometió a esa
+ONG en la emergencia. Por eso, al confirmar la selección, el proceso la invoca solo para las ONG
+que el Sistema Nacional evaluó y no tienen ninguna línea seleccionada (la web arma esa lista,
+`ongsNoSeleccionadas`). En un consorcio, la invoca una vez por cada una de esas organizaciones.
+Una ONG con al menos una línea seleccionada no se libera, aunque tenga otras sin seleccionar o
+una oferta rechazada: perdería lo adjudicado.
+
+> **Limitación aceptada.** Si una ONG tiene algunas líneas seleccionadas y otras no, los recursos
+> no consumibles de las líneas no seleccionadas siguen comprometidos hasta la finalización de la
+> emergencia (`POST /recursos/compromisos/{emergencia_externa_id}/finalizacion`). Hasta entonces
+> no figuran como disponibles para otras emergencias. Liberarlos antes requeriría una liberación
+> por ítem, que la API no ofrece.
 
 Responde `200 OK` con el compromiso liberado. Las repeticiones son idempotentes (`repetido: true`)
-y no reintegran recursos de nuevo.
+y no reintegran recursos de nuevo. Una ONG evaluada puede no tener compromiso, porque todos sus
+aportes eran consumibles o fueron rechazados. En ese caso responde 404, y el script de Bonita lo
+cuenta como "sin compromisos" y sigue con la ONG siguiente.
 
 | HTTP | Código | Significado |
 |---|---|---|
@@ -132,7 +153,7 @@ La llamada responde `200 OK` con el resultado del cierre:
 
 ```json
 {
-  "emergencia_externa_id": "emergencia-2026-0042",
+  "emergencia_externa_id": "0193f4a2-7c1e-7b5d-9a3f-2e8c4b6d1a01",
   "proyecto_cerrado": true,
   "organizaciones_finalizadas": 2,
   "organizaciones_participantes": 2,

@@ -48,7 +48,7 @@ class PeticionCambioHabilitacion(Schema):
 
 
 class OrganizacionPadron(Schema):
-    id = fields.Integer(required=True)
+    id = fields.UUID(required=True)
     cuit = fields.String(attribute="identificador_nacional", required=True)
     nombre = fields.String(required=True)
     tipo = fields.Enum(TipoOrganizacion, by_value=True, required=True)

@@ -167,7 +167,8 @@ migrations/             migraciones de Alembic (0001: línea base;
                         a63f9d20bc41: alineación con el diagrama;
                         b8e41c7d2f90: cuentas y estado de habilitación;
                         c0ebb05602a1: merge de ramas;
-                        4a7c2d9e1f63: cierre global de emergencia y liberación de recursos)
+                        4a7c2d9e1f63: cierre global de emergencia y liberación de recursos;
+                        5b9d3e7a1c42: claves UUID en todas las tablas, conservando los datos)
 tests/                  tests con pytest (SQLite en memoria)
 docs/adr/               decisiones de arquitectura
 docs/contratos/         contratos de autenticación, configuración, errores y logging
@@ -258,8 +259,8 @@ los casos de la épica: 401 sin token o con token adulterado, 403 por rol, alta 
 CUIT duplicado y la ONG suspendida que se vuelve a habilitar. La carpeta de compromisos crea una
 emergencia nueva en cada corrida, la libera por ONG y la finaliza, y la prueba de concurrencia
 libera lo que comprometió: así se puede volver a correr sin ir agotando el stock. La carpeta de
-evaluación todavía usa `emergencia_id` fijos y deja comprometidos 2 paramédicos de Cruz
-Solidaria; el seed los repone en el próximo deploy.
+evaluación todavía usa `emergencia_id` fijos (UUID, iguales a los de Swagger) y deja
+comprometidos 2 paramédicos de Cruz Solidaria; el seed los repone en el próximo deploy.
 
 Datos de demostración del padrón: las mismas organizaciones, CUIT y tipo que la aplicación web
 (Bomberos Voluntarios de La Plata también es ONG), todas `habilitada` salvo

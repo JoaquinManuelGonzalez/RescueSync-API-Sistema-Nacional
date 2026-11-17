@@ -14,7 +14,7 @@ class AporteOfertaSchema(Schema):
         validate=validate.Length(max=255),
     )
     # Es informativo: nunca se usa para cruzar con la base del Sistema Nacional.
-    organizacion_id = fields.Integer(required=True, validate=validate.Range(min=1))
+    organizacion_id = fields.UUID(required=True)
 
 
 class ItemOfertaSchema(Schema):
@@ -25,7 +25,7 @@ class ItemOfertaSchema(Schema):
     )
     cantidad_total = fields.Integer(required=True, strict=True, validate=validate.Range(min=1))
     codigo_recurso = fields.String(required=True, validate=validate.Length(min=1, max=200))
-    lote_item_id = fields.Integer(required=True, validate=validate.Range(min=1))
+    lote_item_id = fields.UUID(required=True)
     tipo_recurso = fields.String(required=True, validate=validate.Length(min=1, max=255))
     unidad = fields.String(required=True, validate=validate.Length(min=1, max=50))
 
@@ -40,7 +40,7 @@ class ItemOfertaSchema(Schema):
 
 
 class OrganizacionOfertaSchema(Schema):
-    id = fields.Integer(required=True, validate=validate.Range(min=1))
+    id = fields.UUID(required=True)
     identificador_nacional = fields.String(
         required=True,
         allow_none=True,
@@ -57,7 +57,7 @@ class OfertaConsolidadaSchema(Schema):
         required=True,
         validate=validate.Length(min=1),
     )
-    oferta_id = fields.Integer(required=True, validate=validate.Range(min=1))
+    oferta_id = fields.UUID(required=True)
     organizaciones = fields.List(
         fields.Nested(OrganizacionOfertaSchema),
         required=True,
@@ -67,7 +67,12 @@ class OfertaConsolidadaSchema(Schema):
 
 
 class EvaluacionOfertasSchema(Schema):
-    emergencia_id = fields.Integer(required=True, validate=validate.Range(min=1))
+    # UUID que la web genera para la emergencia: es la clave de sus compromisos en esta API, así
+    # que tiene que ser único entre todos los entornos que la usan.
+    emergencia_id = fields.UUID(
+        required=True,
+        metadata={"description": "UUID de la emergencia en la aplicación web."},
+    )
     nivel_gravedad = fields.String(required=True)
     # Puede venir vacía: una convocatoria que cerró sin ofertas presentadas se evalúa igual (no
     # compromete nada) para que el proceso siga y decida si reinicia.
@@ -77,7 +82,7 @@ class EvaluacionOfertasSchema(Schema):
 class EvaluacionAporteSchema(Schema):
     cantidad = fields.Integer(required=True)
     identificador_nacional = fields.String(required=True, allow_none=True)
-    organizacion_id = fields.Integer(required=True)
+    organizacion_id = fields.UUID(required=True)
     certificacion_encontrada = fields.Boolean(required=True)
     nivel_riesgo_permitido = fields.Enum(
         NivelCertificacion,
@@ -94,7 +99,7 @@ class ItemEvaluadoSchema(Schema):
     aportes = fields.List(fields.Nested(EvaluacionAporteSchema), required=True)
     cantidad_total = fields.Integer(required=True)
     codigo_recurso = fields.String(required=True)
-    lote_item_id = fields.Integer(required=True)
+    lote_item_id = fields.UUID(required=True)
     tipo_recurso = fields.String(required=True)
     unidad = fields.String(required=True)
     consumible = fields.Boolean(required=True)
@@ -103,11 +108,11 @@ class ItemEvaluadoSchema(Schema):
 class OfertaEvaluadaSchema(Schema):
     fecha_creacion = fields.DateTime(required=True)
     items = fields.List(fields.Nested(ItemEvaluadoSchema), required=True)
-    oferta_id = fields.Integer(required=True)
+    oferta_id = fields.UUID(required=True)
     organizaciones = fields.List(fields.Nested(OrganizacionOfertaSchema), required=True)
 
 
 class RespuestaEvaluacionSchema(Schema):
-    emergencia_id = fields.Integer(required=True)
+    emergencia_id = fields.UUID(required=True)
     nivel_gravedad = fields.String(required=True)
     ofertas = fields.List(fields.Nested(OfertaEvaluadaSchema), required=True)

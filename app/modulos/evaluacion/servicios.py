@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from collections import defaultdict
 from dataclasses import replace
 
@@ -98,7 +99,7 @@ def _evaluar_aporte(
     aporte: dict,
     recurso: Item,
     requerido: NivelCertificacion,
-    reservado: defaultdict[int, int],
+    reservado: defaultdict[uuid.UUID, int],
 ) -> tuple[dict, AporteSolicitado | None]:
     """Clasifica un aporte. `reservado` acumula, por fila de inventario, lo ya aceptado en esta
     evaluación: la misma ONG puede ofrecer el mismo recurso en varias líneas (un ítem pedido en
@@ -187,7 +188,7 @@ def _evaluar_aporte(
 def _evaluar_item(
     item_oferta: dict,
     requerido: NivelCertificacion,
-    reservado: defaultdict[int, int],
+    reservado: defaultdict[uuid.UUID, int],
 ) -> tuple[dict, list[AporteSolicitado]]:
     codigo = item_oferta["codigo_recurso"].strip()
     recurso = db.session.scalar(select(Item).where(Item.codigo_recurso == codigo))
@@ -239,11 +240,15 @@ def _sumar_por_organizacion_y_recurso(
 
 def evaluar_ofertas(
     *,
-    emergencia_id: int,
+    emergencia_id: uuid.UUID,
     nivel_gravedad: str,
     ofertas: list[dict],
 ) -> dict:
-    """Evalúa aportes por ítem y compromete los recursos no consumibles aceptados."""
+    """Evalúa aportes por ítem y compromete los recursos no consumibles aceptados.
+
+    Los compromisos quedan bajo `str(emergencia_id)`, el UUID en su forma canónica (minúsculas y
+    con guiones), que es la misma que usan los endpoints de liberación y finalización.
+    """
     gravedad = nivel_gravedad.strip().upper()
     requerido = _nivel_requerido(gravedad)
     try:
@@ -256,7 +261,7 @@ def evaluar_ofertas(
 
     evaluadas = []
     aportes_comprometidos = []
-    reservado: defaultdict[int, int] = defaultdict(int)
+    reservado: defaultdict[uuid.UUID, int] = defaultdict(int)
     for oferta in ofertas:
         items_evaluados = []
         for item in oferta["items"]:

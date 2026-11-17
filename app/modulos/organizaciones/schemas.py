@@ -13,7 +13,7 @@ class PaginacionQuerySchema(Schema):
 
 
 class CertificacionSchema(Schema):
-    id = fields.Integer(dump_only=True)
+    id = fields.UUID(dump_only=True)
     nombre = fields.String(required=True)
     tipo = fields.String(required=True)
 
@@ -26,11 +26,7 @@ class CatalogoCertificacionesSchema(Schema):
 
 
 class ConsultaOrganizacionesQuerySchema(PaginacionQuerySchema):
-    certificacion_id = fields.Integer(
-        load_default=None,
-        allow_none=True,
-        validate=validate.Range(min=1),
-    )
+    certificacion_id = fields.UUID(load_default=None, allow_none=True)
     nivel_certificacion = fields.Enum(
         NivelCertificacion,
         by_value=True,
@@ -40,13 +36,13 @@ class ConsultaOrganizacionesQuerySchema(PaginacionQuerySchema):
 
 
 class OrganizacionCertificacionSchema(Schema):
-    id = fields.Integer(required=True)
+    id = fields.UUID(required=True)
     nombre = fields.String(required=True)
     nivel_certificacion = fields.Enum(NivelCertificacion, by_value=True, required=True)
 
 
 class OrganizacionConsultaSchema(Schema):
-    id = fields.Integer(required=True)
+    id = fields.UUID(required=True)
     cuit = fields.String(required=True, allow_none=True)
     nombre = fields.String(required=True)
     mail_contacto = fields.String(required=True)
@@ -68,7 +64,7 @@ class ConsultaDisponibilidadQuerySchema(PaginacionQuerySchema):
 
 
 class DisponibilidadRecursoSchema(Schema):
-    id = fields.Integer(required=True)
+    id = fields.UUID(required=True)
     nombre = fields.String(required=True)
     tipo = fields.String(required=True)
     unidad_medida = fields.String(required=True)
@@ -86,25 +82,25 @@ class DisponibilidadPaginadaSchema(Schema):
 
 
 class PeticionCargaInventarioSchema(Schema):
-    item_id = fields.Integer(required=True, validate=validate.Range(min=1))
+    item_id = fields.UUID(required=True)
     cantidad_disponible = fields.Integer(required=True, validate=validate.Range(min=0))
 
 
 class InventarioCargadoSchema(Schema):
-    id = fields.Integer(required=True)
-    item_id = fields.Integer(required=True)
+    id = fields.UUID(required=True)
+    item_id = fields.UUID(required=True)
     item_nombre = fields.String(required=True)
     cantidad_disponible = fields.Integer(required=True)
 
 
 class PeticionCargaCertificacionSchema(Schema):
-    certificacion_id = fields.Integer(required=True, validate=validate.Range(min=1))
+    certificacion_id = fields.UUID(required=True)
     nivel_certificacion = fields.Enum(NivelCertificacion, by_value=True, required=True)
 
 
 class CertificacionCargadaSchema(Schema):
-    id = fields.Integer(required=True)
-    certificacion_id = fields.Integer(required=True)
+    id = fields.UUID(required=True)
+    certificacion_id = fields.UUID(required=True)
     certificacion_nombre = fields.String(required=True)
     nivel_certificacion = fields.Enum(NivelCertificacion, by_value=True, required=True)
     fecha_emision = fields.DateTime(required=True)

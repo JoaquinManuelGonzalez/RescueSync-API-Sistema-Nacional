@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 
 from app.extensiones import db
@@ -70,13 +71,14 @@ def test_evaluacion_clasifica_cada_item_y_compromete_no_consumibles(base_de_dato
     db.session.add_all([ambulancia, agua, cert_rescate, cert_agua, organizacion])
     db.session.commit()
 
+    emergencia_id = uuid.uuid7()
     resultado = evaluar_ofertas(
-        emergencia_id=14,
+        emergencia_id=emergencia_id,
         nivel_gravedad="ALTA",
         ofertas=[
             {
                 "fecha_creacion": datetime.now(UTC),
-                "oferta_id": 7,
+                "oferta_id": uuid.uuid7(),
                 "organizaciones": [],
                 "version": 2,
                 "items": [
@@ -85,12 +87,12 @@ def test_evaluacion_clasifica_cada_item_y_compromete_no_consumibles(base_de_dato
                             {
                                 "cantidad": 5,
                                 "identificador_nacional": organizacion.identificador_nacional,
-                                "organizacion_id": 999,
+                                "organizacion_id": uuid.uuid7(),
                             }
                         ],
                         "cantidad_total": 5,
                         "codigo_recurso": ambulancia.codigo_recurso,
-                        "lote_item_id": 10,
+                        "lote_item_id": uuid.uuid7(),
                         "tipo_recurso": "rescate",
                         "unidad": "unidades",
                     },
@@ -99,12 +101,12 @@ def test_evaluacion_clasifica_cada_item_y_compromete_no_consumibles(base_de_dato
                             {
                                 "cantidad": 100,
                                 "identificador_nacional": organizacion.identificador_nacional,
-                                "organizacion_id": 999,
+                                "organizacion_id": uuid.uuid7(),
                             }
                         ],
                         "cantidad_total": 100,
                         "codigo_recurso": agua.codigo_recurso,
-                        "lote_item_id": 11,
+                        "lote_item_id": uuid.uuid7(),
                         "tipo_recurso": "agua",
                         "unidad": "litros",
                     },
@@ -123,6 +125,8 @@ def test_evaluacion_clasifica_cada_item_y_compromete_no_consumibles(base_de_dato
     assert items[0]["aportes"][0]["compromiso_registrado"] is True
     assert db.session.query(Compromiso).count() == 1
     assert db.session.query(Compromiso).one().items[0].tipo_asignacion is TipoAsignacion.apoyo
+    # Queda bajo el UUID en forma canónica, la misma que usan liberación y finalización.
+    assert db.session.query(Compromiso).one().emergencia_externa_id == str(emergencia_id)
 
 
 def test_evaluacion_rechaza_sin_certificacion_y_por_stock_insuficiente(base_de_datos):
@@ -149,12 +153,12 @@ def test_evaluacion_rechaza_sin_certificacion_y_por_stock_insuficiente(base_de_d
     db.session.commit()
 
     resultado = evaluar_ofertas(
-        emergencia_id=15,
+        emergencia_id=uuid.uuid7(),
         nivel_gravedad="BAJA",
         ofertas=[
             {
                 "fecha_creacion": datetime.now(UTC),
-                "oferta_id": 8,
+                "oferta_id": uuid.uuid7(),
                 "organizaciones": [],
                 "version": 1,
                 "items": [
@@ -163,12 +167,12 @@ def test_evaluacion_rechaza_sin_certificacion_y_por_stock_insuficiente(base_de_d
                             {
                                 "cantidad": 2,
                                 "identificador_nacional": organizacion.identificador_nacional,
-                                "organizacion_id": 998,
+                                "organizacion_id": uuid.uuid7(),
                             }
                         ],
                         "cantidad_total": 2,
                         "codigo_recurso": ambulancia.codigo_recurso,
-                        "lote_item_id": 12,
+                        "lote_item_id": uuid.uuid7(),
                         "tipo_recurso": "rescate",
                         "unidad": "unidades",
                     }
@@ -208,24 +212,28 @@ def _ong_con_ambulancias(*, cuit: str = "30-33333333-3", stock: int = 5) -> Orga
 
 
 def _aporte(identificador: str | None, cantidad: int) -> dict:
-    return {"cantidad": cantidad, "identificador_nacional": identificador, "organizacion_id": 900}
+    return {
+        "cantidad": cantidad,
+        "identificador_nacional": identificador,
+        "organizacion_id": uuid.uuid7(),
+    }
 
 
-def _item_ofertado(aportes: list[dict], *, lote_item_id: int = 10) -> dict:
+def _item_ofertado(aportes: list[dict]) -> dict:
     return {
         "aportes": aportes,
         "cantidad_total": sum(aporte["cantidad"] for aporte in aportes),
         "codigo_recurso": "RSR-AMBULANCIAS",
-        "lote_item_id": lote_item_id,
+        "lote_item_id": uuid.uuid7(),
         "tipo_recurso": "rescate",
         "unidad": "unidades",
     }
 
 
-def _oferta(items: list[dict], *, oferta_id: int = 1) -> dict:
+def _oferta(items: list[dict]) -> dict:
     return {
         "fecha_creacion": datetime.now(UTC),
-        "oferta_id": oferta_id,
+        "oferta_id": uuid.uuid7(),
         "organizaciones": [],
         "version": 1,
         "items": items,
@@ -236,7 +244,7 @@ def test_evaluacion_rechaza_solo_el_aporte_sin_cuit(base_de_datos):
     organizacion = _ong_con_ambulancias()
 
     resultado = evaluar_ofertas(
-        emergencia_id=20,
+        emergencia_id=uuid.uuid7(),
         nivel_gravedad="ALTA",
         ofertas=[
             _oferta(
@@ -270,7 +278,7 @@ def test_evaluacion_encuentra_la_ong_con_cuit_sin_guiones(base_de_datos):
     _ong_con_ambulancias(cuit="30-33333333-3")
 
     resultado = evaluar_ofertas(
-        emergencia_id=21,
+        emergencia_id=uuid.uuid7(),
         nivel_gravedad="ALTA",
         ofertas=[_oferta([_item_ofertado([_aporte(" 30333333333 ", 2)])])],
     )
@@ -288,13 +296,13 @@ def test_evaluacion_suma_el_mismo_recurso_de_una_ong_pedido_en_dos_lotes(base_de
     cuit = organizacion.identificador_nacional
 
     resultado = evaluar_ofertas(
-        emergencia_id=22,
+        emergencia_id=uuid.uuid7(),
         nivel_gravedad="ALTA",
         ofertas=[
             _oferta(
                 [
-                    _item_ofertado([_aporte(cuit, 2)], lote_item_id=10),
-                    _item_ofertado([_aporte(cuit, 3)], lote_item_id=11),
+                    _item_ofertado([_aporte(cuit, 2)]),
+                    _item_ofertado([_aporte(cuit, 3)]),
                 ]
             )
         ],
@@ -313,11 +321,11 @@ def test_evaluacion_controla_el_stock_acumulado_entre_lineas_de_una_ong(base_de_
     cuit = organizacion.identificador_nacional
 
     resultado = evaluar_ofertas(
-        emergencia_id=23,
+        emergencia_id=uuid.uuid7(),
         nivel_gravedad="ALTA",
         ofertas=[
-            _oferta([_item_ofertado([_aporte(cuit, 3)], lote_item_id=10)], oferta_id=1),
-            _oferta([_item_ofertado([_aporte(cuit, 3)], lote_item_id=11)], oferta_id=2),
+            _oferta([_item_ofertado([_aporte(cuit, 3)])]),
+            _oferta([_item_ofertado([_aporte(cuit, 3)])]),
         ],
     )
 

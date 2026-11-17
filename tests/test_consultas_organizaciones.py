@@ -39,12 +39,8 @@ def base_de_datos(app):
 
 
 def test_consulta_certificaciones_admite_paginacion(base_de_datos, cliente, cabeceras):
-    db.session.add_all(
-        [
-            Certificacion(nombre="Brigada", tipo=TipoItem.rescate),
-            Certificacion(nombre="Primeros auxilios", tipo=TipoItem.personal_medico),
-        ]
-    )
+    primeros_auxilios = Certificacion(nombre="Primeros auxilios", tipo=TipoItem.personal_medico)
+    db.session.add_all([Certificacion(nombre="Brigada", tipo=TipoItem.rescate), primeros_auxilios])
     db.session.commit()
 
     respuesta = cliente.get(
@@ -54,7 +50,13 @@ def test_consulta_certificaciones_admite_paginacion(base_de_datos, cliente, cabe
 
     assert respuesta.status_code == 200
     assert respuesta.get_json() == {
-        "elementos": [{"id": 2, "nombre": "Primeros auxilios", "tipo": "personal_medico"}],
+        "elementos": [
+            {
+                "id": str(primeros_auxilios.id),
+                "nombre": "Primeros auxilios",
+                "tipo": "personal_medico",
+            }
+        ],
         "pagina": 2,
         "por_pagina": 1,
         "total": 2,
@@ -98,11 +100,23 @@ def test_consulta_ongs_filtra_por_certificacion_y_nivel(base_de_datos, cliente, 
     assert cuerpo["elementos"][0]["cuit"] == "30-12345678-9"
     assert cuerpo["elementos"][0]["certificaciones"] == [
         {
-            "id": certificacion.id,
+            "id": str(certificacion.id),
             "nombre": "Rescate",
             "nivel_certificacion": "alta",
         }
     ]
+
+
+@pytest.mark.parametrize("valor", ["6", "no-es-un-uuid"])
+def test_consulta_ongs_rechaza_una_certificacion_que_no_es_uuid(
+    base_de_datos, cliente, cabeceras, valor
+):
+    respuesta = cliente.get(f"/ongs?certificacion_id={valor}", headers=cabeceras())
+
+    assert respuesta.status_code == 400
+    error = respuesta.get_json()["error"]
+    assert error["codigo"] == "SOLICITUD_INVALIDA"
+    assert error["detalle"] == {"query": {"certificacion_id": ["Debe ser un UUID válido."]}}
 
 
 def test_disponibilidad_expone_inventario_y_compromisos_activos(base_de_datos, cliente, cabeceras):
@@ -158,7 +172,7 @@ def test_disponibilidad_expone_inventario_y_compromisos_activos(base_de_datos, c
     assert respuesta.status_code == 200
     assert respuesta.get_json()["elementos"] == [
         {
-            "id": item.id,
+            "id": str(item.id),
             "nombre": "Generador",
             "tipo": "maquinaria",
             "unidad_medida": "unidades",

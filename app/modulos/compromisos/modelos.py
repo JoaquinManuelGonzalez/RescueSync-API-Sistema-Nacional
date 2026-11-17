@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import enum
+import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    BigInteger,
     CheckConstraint,
     DateTime,
     Enum,
@@ -14,10 +14,12 @@ from sqlalchemy import (
     Integer,
     String,
     UniqueConstraint,
+    Uuid,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.identificadores import nuevo_id
 from app.extensiones import db
 from app.modulos.organizaciones.modelos import InventarioItem, Organizacion
 
@@ -64,10 +66,10 @@ class Compromiso(db.Model):
         ),
     )
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    organizacion_id: Mapped[int] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=nuevo_id)
+    organizacion_id: Mapped[uuid.UUID] = mapped_column(
         "id_organizacion",
-        BigInteger().with_variant(Integer, "sqlite"),
+        Uuid,
         ForeignKey("organizaciones.id"),
         nullable=False,
     )
@@ -145,16 +147,16 @@ class CompromisoItem(db.Model):
         CheckConstraint("cantidad_comprometida > 0", name="cantidad_comprometida_positiva"),
     )
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    compromiso_id: Mapped[int] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=nuevo_id)
+    compromiso_id: Mapped[uuid.UUID] = mapped_column(
         "id_compromiso",
-        Integer,
+        Uuid,
         ForeignKey("compromisos.id", ondelete="CASCADE"),
         nullable=False,
     )
-    inventario_item_id: Mapped[int] = mapped_column(
+    inventario_item_id: Mapped[uuid.UUID] = mapped_column(
         "id_inventario_item",
-        Integer,
+        Uuid,
         ForeignKey("inventario_items.id"),
         nullable=False,
     )

@@ -1,10 +1,21 @@
 from __future__ import annotations
 
+import importlib.util
+import re
+import uuid
+from pathlib import Path
+from types import SimpleNamespace
+
 import pytest
 from sqlalchemy import select
 from werkzeug.security import check_password_hash
 
 from app.core.acceso import Rol
+from app.core.identificadores import (
+    ESPACIO_SISTEMA_NACIONAL,
+    id_de_certificacion,
+    id_de_item,
+)
 from app.extensiones import db
 from app.modulos.autenticacion.modelos import Cuenta
 from app.modulos.autenticacion.servicios import autenticar
@@ -105,6 +116,58 @@ def test_tipos_de_certificacion_son_categorias_de_items(base_de_datos):
     assert tipos_de_certificaciones <= set(TipoItem)
     assert tipos_de_certificaciones <= tipos_de_items
     assert db.session.query(InventarioItem).count() > 0
+
+
+def test_semillas_dan_al_catalogo_un_id_fijo(base_de_datos):
+    # El mismo recurso tiene el mismo id en todas las bases: los ejemplos de Swagger y la
+    # colección Postman usan esos ids, y la migración a UUID calcula los mismos.
+    _sembrar()
+
+    for item in db.session.query(Item).all():
+        assert item.id == id_de_item(item.codigo_recurso)
+    for certificacion in db.session.query(Certificacion).all():
+        assert certificacion.id == id_de_certificacion(
+            certificacion.nombre, certificacion.tipo.value
+        )
+
+
+def test_la_migracion_a_uuid_calcula_los_mismos_ids_que_la_app():
+    # La migración tiene una copia congelada de las fórmulas: si la app cambiara, la base
+    # migrada y la sembrada tendrían ids distintos para el mismo recurso.
+    ruta = next(Path("migrations/versions").glob("5b9d3e7a1c42_*.py"))
+    especificacion = importlib.util.spec_from_file_location("migracion_uuid", ruta)
+    migracion = importlib.util.module_from_spec(especificacion)
+    especificacion.loader.exec_module(migracion)
+    item = SimpleNamespace(codigo_recurso="RSR-PARAMEDICOS")
+    certificacion = SimpleNamespace(nombre="Certificación de apoyo logístico", tipo="otro")
+
+    assert migracion.ESPACIO_SISTEMA_NACIONAL == ESPACIO_SISTEMA_NACIONAL
+    assert migracion._id_de_item(item, 1) == id_de_item("RSR-PARAMEDICOS")
+    assert migracion._id_de_certificacion(certificacion, 1) == id_de_certificacion(
+        "Certificación de apoyo logístico", "otro"
+    )
+
+
+UUID_EN_TEXTO = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+
+
+def test_los_ids_del_catalogo_en_swagger_existen_en_la_base_sembrada(base_de_datos, cliente):
+    # Los ejemplos de Swagger usan los ids reales del catálogo (UUIDv5, que salen de su clave
+    # natural): un ítem o una certificación que se renombre en la semilla dejaría un ejemplo con
+    # un id que no existe, y el profesor recibiría 404 al copiarlo.
+    _sembrar()
+    especificacion = cliente.get("/openapi.json").get_data(as_text=True)
+    del_catalogo = {
+        uuid.UUID(texto)
+        for texto in UUID_EN_TEXTO.findall(especificacion)
+        if uuid.UUID(texto).version == 5
+    }
+    existentes = {item.id for item in db.session.query(Item)} | {
+        certificacion.id for certificacion in db.session.query(Certificacion)
+    }
+
+    assert len(del_catalogo) >= 5
+    assert del_catalogo <= existentes
 
 
 def test_semillas_tienen_una_certificacion_por_tipo(base_de_datos):

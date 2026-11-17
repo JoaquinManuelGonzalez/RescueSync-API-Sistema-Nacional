@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 from flask.views import MethodView
 
 from app.core.acceso import Blueprint, Rol
@@ -24,7 +26,7 @@ blueprint_compromisos = Blueprint(
 )
 
 EJEMPLO_COMPROMISO = {
-    "emergencia_externa_id": "emergencia-demo-01",
+    "emergencia_externa_id": "0193f4a2-7c1e-7b5d-9a3f-2e8c4b6d1a01",
     "nivel_gravedad": "MEDIA",
     "aportes": [
         {
@@ -85,8 +87,9 @@ class CompromisoDeRecursos(MethodView):
         La lista ya debe venir seleccionada por el proceso. Este endpoint no adjudica ofertas
         ni evalúa competencias.
         """
+        emergencia_externa_id = str(datos["emergencia_externa_id"])
         resultado = servicios.comprometer_recursos(
-            emergencia_externa_id=datos["emergencia_externa_id"],
+            emergencia_externa_id=emergencia_externa_id,
             nivel_gravedad=datos["nivel_gravedad"],
             aportes=[
                 AporteSolicitado(
@@ -99,7 +102,7 @@ class CompromisoDeRecursos(MethodView):
             ],
         )
         cuerpo = {
-            "emergencia_externa_id": datos["emergencia_externa_id"].strip(),
+            "emergencia_externa_id": emergencia_externa_id,
             "repetido": resultado.repetido,
             "compromisos": [
                 {
@@ -121,7 +124,7 @@ class CompromisoDeRecursos(MethodView):
         return cuerpo, 200 if resultado.repetido else 201
 
 
-@blueprint_compromisos.route("/<string:emergencia_externa_id>/liberacion")
+@blueprint_compromisos.route("/<uuid:emergencia_externa_id>/liberacion")
 class LiberacionDeRecursos(MethodView):
     @blueprint_compromisos.requiere_rol(Rol.sistema)
     @blueprint_compromisos.response(
@@ -138,11 +141,11 @@ class LiberacionDeRecursos(MethodView):
         schema=RespuestaError,
         description="El estado actual de los compromisos impide liberarlos.",
     )
-    def post(self, emergencia_externa_id: str):
+    def post(self, emergencia_externa_id: uuid.UUID):
         """Liberar los recursos comprometidos cuando se reinicia una convocatoria."""
-        resultado = servicios.liberar_recursos(emergencia_externa_id=emergencia_externa_id)
+        resultado = servicios.liberar_recursos(emergencia_externa_id=str(emergencia_externa_id))
         return {
-            "emergencia_externa_id": emergencia_externa_id.strip(),
+            "emergencia_externa_id": emergencia_externa_id,
             "repetido": resultado.repetido,
             "compromisos": [
                 {
@@ -164,7 +167,7 @@ class LiberacionDeRecursos(MethodView):
 
 
 @blueprint_compromisos.route(
-    "/<string:emergencia_externa_id>/ongs/<string:identificador_nacional>/liberacion"
+    "/<uuid:emergencia_externa_id>/ongs/<string:identificador_nacional>/liberacion"
 )
 class LiberacionDeRecursosONG(MethodView):
     @blueprint_compromisos.requiere_rol(Rol.sistema)
@@ -186,14 +189,19 @@ class LiberacionDeRecursosONG(MethodView):
         schema=RespuestaError,
         description="El estado actual del compromiso impide liberarlo.",
     )
-    def post(self, emergencia_externa_id: str, identificador_nacional: str):
-        """Liberar el compromiso de una ONG al descartar su oferta."""
+    def post(self, emergencia_externa_id: uuid.UUID, identificador_nacional: str):
+        """Liberar el compromiso de una ONG al descartar su oferta.
+
+        Libera todo lo que la ONG tiene comprometido en la emergencia: la API no libera por
+        ítem. Por eso el proceso no la llama para una ONG con parte de sus aportes adjudicados,
+        y lo no adjudicado de esa ONG queda comprometido hasta la finalización de la emergencia.
+        """
         resultado = servicios.liberar_recursos_ong(
-            emergencia_externa_id=emergencia_externa_id,
+            emergencia_externa_id=str(emergencia_externa_id),
             identificador_nacional=identificador_nacional,
         )
         return {
-            "emergencia_externa_id": emergencia_externa_id.strip(),
+            "emergencia_externa_id": emergencia_externa_id,
             "repetido": resultado.repetido,
             "compromisos": [
                 {
@@ -215,7 +223,7 @@ class LiberacionDeRecursosONG(MethodView):
 
 
 EJEMPLO_VALIDACION = {
-    "emergencia_externa_id": "emergencia-demo-01",
+    "emergencia_externa_id": "0193f4a2-7c1e-7b5d-9a3f-2e8c4b6d1a01",
     "nivel_gravedad": "MEDIA",
     "aportes": [
         {
@@ -264,7 +272,7 @@ class ValidacionDeRestricciones(MethodView):
         sin verificaci\u00f3n de stock.
         """
         resultado = servicios.validar_restricciones(
-            emergencia_externa_id=datos["emergencia_externa_id"],
+            emergencia_externa_id=str(datos["emergencia_externa_id"]),
             nivel_gravedad=datos["nivel_gravedad"],
             aportes=[
                 AporteSolicitado(
@@ -291,7 +299,7 @@ class ValidacionDeRestricciones(MethodView):
         }
 
 
-@blueprint_compromisos.route("/<string:emergencia_externa_id>/finalizacion")
+@blueprint_compromisos.route("/<uuid:emergencia_externa_id>/finalizacion")
 class FinalizacionDeEmergencia(MethodView):
     @blueprint_compromisos.requiere_rol(Rol.sistema)
     @blueprint_compromisos.response(
@@ -311,9 +319,9 @@ class FinalizacionDeEmergencia(MethodView):
         schema=RespuestaError,
         description="La emergencia tiene compromisos en un estado que impide finalizarla.",
     )
-    def post(self, emergencia_externa_id: str):
+    def post(self, emergencia_externa_id: uuid.UUID):
         """Finalizar una emergencia luego de que el proceso confirme todas las tareas."""
-        resultado = servicios.finalizar_emergencia(emergencia_externa_id=emergencia_externa_id)
+        resultado = servicios.finalizar_emergencia(emergencia_externa_id=str(emergencia_externa_id))
         return {
             "emergencia_externa_id": resultado.emergencia_externa_id,
             "proyecto_cerrado": resultado.proyecto_cerrado,

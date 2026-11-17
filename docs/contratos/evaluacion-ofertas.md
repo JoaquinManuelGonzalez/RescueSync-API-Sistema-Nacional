@@ -6,15 +6,15 @@ individual o un consorcio; en el segundo caso cada miembro se evalúa de manera 
 
 ```json
 {
-  "emergencia_id": 14,
+  "emergencia_id": "0193f4a2-7c1e-7e00-9e00-000000000014",
   "nivel_gravedad": "MEDIA",
   "ofertas": [
     {
       "fecha_creacion": "2026-10-16T14:40:44Z",
-      "oferta_id": 7,
+      "oferta_id": "0193f4a2-7c1e-7f00-9f00-000000000007",
       "organizaciones": [
         {
-          "id": 8,
+          "id": "0193f4a2-7c1e-7c00-9c00-000000000008",
           "identificador_nacional": "30-99999999-4",
           "nombre": "Cruz Roja Argentina - Filial Bahía Blanca",
           "rol": "lider"
@@ -27,12 +27,12 @@ individual o un consorcio; en el segundo caso cada miembro se evalúa de manera 
             {
               "cantidad": 2,
               "identificador_nacional": "30-65432198-7",
-              "organizacion_id": 6
+              "organizacion_id": "0193f4a2-7c1e-7c00-9c00-000000000006"
             }
           ],
           "cantidad_total": 2,
           "codigo_recurso": "RSR-ENFERMEROS",
-          "lote_item_id": 10,
+          "lote_item_id": "0193f4a2-7c1e-7a00-9a00-000000000010",
           "tipo_recurso": "personal_medico",
           "unidad": "personas"
         }
@@ -45,6 +45,13 @@ individual o un consorcio; en el segundo caso cada miembro se evalúa de manera 
 `ofertas` puede ser una lista vacía: pasa cuando la convocatoria cerró sin ofertas presentadas.
 En ese caso la API responde `200 OK` con `"ofertas": []` y no compromete nada, para que el proceso
 siga y pueda reiniciar la convocatoria. Omitir el campo sigue siendo un 400.
+
+Todos los ids que manda la web son UUID: `emergencia_id`, `oferta_id`, `lote_item_id`,
+`organizacion_id` y el `id` de cada organización. Un entero responde 400. `emergencia_id` es la
+clave con la que quedan los compromisos, en forma canónica (minúsculas y con guiones), y es la
+misma que después usan la liberación y la finalización de
+[compromisos](compromisos.md). Que sea un UUID evita que la emergencia `1` de una web local pise
+los compromisos de la emergencia `1` de otra que usa la misma API.
 
 Cada ítem consolidado puede tener aportes de varias organizaciones. Para cruzar con el padrón
 nacional se usa exclusivamente `identificador_nacional`; `organizacion_id` pertenece al sistema

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Enum, Integer, String, Text, func, text
+from sqlalchemy import Boolean, DateTime, Enum, String, Text, Uuid, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.acceso import Rol
+from app.core.identificadores import nuevo_id
 from app.extensiones import db
 
 
@@ -20,10 +22,7 @@ class Cuenta(db.Model):
 
     __tablename__ = "cuentas"
 
-    id: Mapped[int] = mapped_column(
-        BigInteger().with_variant(Integer, "sqlite"),
-        primary_key=True,
-    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=nuevo_id)
     usuario: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     rol: Mapped[Rol] = mapped_column(
