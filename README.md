@@ -262,8 +262,11 @@ emergencia nueva en cada corrida, la libera por ONG y la finaliza, y la prueba d
 libera lo que comprometió: así se puede volver a correr sin ir agotando el stock. La carpeta de
 evaluación todavía usa `emergencia_id` fijos (UUID, iguales a los de Swagger): la primera
 corrida deja comprometidos 2 paramédicos de Cruz Solidaria en la emergencia `…000000000014` y
-las siguientes repiten ese mismo compromiso (`repetido`), sin sumar otro. Los ids de las
-entidades son UUID ([ADR-006](docs/adr/ADR-006-claves-uuid.md)).
+las siguientes repiten ese mismo compromiso (`repetido`), sin sumar otro. Los pasos que
+dependen de los datos de demostración no asumen el estado de la base compartida: el padrón
+vuelve a suspender a Cruz Roja si alguien la habilitó, y el caso de cantidad insuficiente lee
+los paramédicos disponibles y pide uno más. Los ids de las entidades son UUID
+([ADR-006](docs/adr/ADR-006-claves-uuid.md)).
 
 Datos de demostración del padrón: las mismas organizaciones, CUIT y tipo que la aplicación web
 (Bomberos Voluntarios de La Plata también es ONG), todas `habilitada` salvo

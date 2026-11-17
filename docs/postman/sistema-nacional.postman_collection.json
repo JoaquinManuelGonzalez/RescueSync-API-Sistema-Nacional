@@ -875,7 +875,7 @@
                 "30-99999999-4"
               ]
             },
-            "description": "Cruz Roja Bahía Blanca está registrada pero suspendida: no puede ofertar.",
+            "description": "Cruz Roja Bahía Blanca está registrada pero suspendida: no puede ofertar. El pre-request la deja suspendida si alguien la habilitó en la base.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -888,6 +888,35 @@
             }
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// La colección parte de Cruz Roja suspendida (dato de demostración). Si alguien la habilitó",
+                  "// en la base compartida, se la vuelve a suspender: 200 si cambió, 409 si ya estaba así.",
+                  "pm.sendRequest({",
+                  "  url: pm.variables.get(\"baseUrl\") + \"/ongs/30-99999999-4/habilitacion\",",
+                  "  method: \"PATCH\",",
+                  "  header: {",
+                  "    \"Content-Type\": \"application/json\",",
+                  "    Authorization: \"Bearer \" + pm.collectionVariables.get(\"tokenAdmin\")",
+                  "  },",
+                  "  body: {",
+                  "    mode: \"raw\",",
+                  "    raw: JSON.stringify({",
+                  "      estado: \"suspendida\",",
+                  "      motivo: \"Certificación sanitaria vencida (dato de demostración).\"",
+                  "    })",
+                  "  }",
+                  "}, (error, respuesta) => {",
+                  "  if (error || ![200, 409].includes(respuesta.code)) {",
+                  "    console.warn(\"No se pudo dejar suspendida a Cruz Roja\", error || respuesta.code);",
+                  "  }",
+                  "});"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -2283,7 +2312,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"emergencia_id\": \"0193f4a2-7c1e-7e00-9e00-000000000016\",\n  \"nivel_gravedad\": \"ALTA\",\n  \"ofertas\": [\n    {\n      \"fecha_creacion\": \"2026-10-20T17:00:00Z\",\n      \"items\": [\n        {\n          \"aportes\": [\n            {\n              \"cantidad\": 11,\n              \"identificador_nacional\": \"30-65432198-7\",\n              \"organizacion_id\": \"0193f4a2-7c1e-7c00-9c00-000000000006\"\n            }\n          ],\n          \"cantidad_total\": 11,\n          \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n          \"lote_item_id\": \"0193f4a2-7c1e-7a00-9a00-000000000012\",\n          \"tipo_recurso\": \"personal_medico\",\n          \"unidad\": \"personas\"\n        }\n      ],\n      \"oferta_id\": \"0193f4a2-7c1e-7f00-9f00-000000000009\",\n      \"organizaciones\": [\n        {\n          \"id\": \"0193f4a2-7c1e-7c00-9c00-000000000006\",\n          \"identificador_nacional\": \"30-65432198-7\",\n          \"nombre\": \"Cruz Solidaria\",\n          \"rol\": \"aportante\"\n        }\n      ],\n      \"version\": 1\n    }\n  ]\n}",
+              "raw": "{\n  \"emergencia_id\": \"0193f4a2-7c1e-7e00-9e00-000000000016\",\n  \"nivel_gravedad\": \"ALTA\",\n  \"ofertas\": [\n    {\n      \"fecha_creacion\": \"2026-10-20T17:00:00Z\",\n      \"items\": [\n        {\n          \"aportes\": [\n            {\n              \"cantidad\": {{cantidadInsuficiente}},\n              \"identificador_nacional\": \"30-65432198-7\",\n              \"organizacion_id\": \"0193f4a2-7c1e-7c00-9c00-000000000006\"\n            }\n          ],\n          \"cantidad_total\": {{cantidadInsuficiente}},\n          \"codigo_recurso\": \"RSR-PARAMEDICOS\",\n          \"lote_item_id\": \"0193f4a2-7c1e-7a00-9a00-000000000012\",\n          \"tipo_recurso\": \"personal_medico\",\n          \"unidad\": \"personas\"\n        }\n      ],\n      \"oferta_id\": \"0193f4a2-7c1e-7f00-9f00-000000000009\",\n      \"organizaciones\": [\n        {\n          \"id\": \"0193f4a2-7c1e-7c00-9c00-000000000006\",\n          \"identificador_nacional\": \"30-65432198-7\",\n          \"nombre\": \"Cruz Solidaria\",\n          \"rol\": \"aportante\"\n        }\n      ],\n      \"version\": 1\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2292,6 +2321,28 @@
             }
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// El caso tiene que ofertar más paramédicos de los que tiene Cruz Solidaria. La base",
+                  "// compartida puede tener otro stock que la semilla (10), así que se lee la disponibilidad",
+                  "// real y se pide uno más. Como se rechaza, no compromete nada.",
+                  "pm.sendRequest({",
+                  "  url: pm.variables.get(\"baseUrl\") +",
+                  "    \"/ongs/30-65432198-7/recursos/disponibilidad?tipo=personal_medico&por_pagina=100\",",
+                  "  method: \"GET\",",
+                  "  header: { Authorization: \"Bearer \" + pm.collectionVariables.get(\"tokenBonita\") }",
+                  "}, (error, respuesta) => {",
+                  "  const paramedicos = !error && respuesta.code === 200",
+                  "    ? respuesta.json().elementos.find((recurso) => recurso.nombre === \"Paramédicos\")",
+                  "    : undefined;",
+                  "  pm.collectionVariables.set(\"cantidadInsuficiente\", paramedicos ? paramedicos.disponible + 1 : 11);",
+                  "});"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -2397,6 +2448,10 @@
     {
       "key": "emergenciaPostmanId",
       "value": ""
+    },
+    {
+      "key": "cantidadInsuficiente",
+      "value": "11"
     }
   ]
 }
