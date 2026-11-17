@@ -255,7 +255,11 @@ Render, las cuentas se crean solas en el deploy a partir de `SEMILLA_CONTRASENA_
 `local` o `render` de la misma carpeta, completar las credenciales del entorno y correr la
 colección en orden. Los dos logins guardan sus tokens en variables y los demás pedidos muestran
 los casos de la épica: 401 sin token o con token adulterado, 403 por rol, alta de una ONG, 409 por
-CUIT duplicado y la ONG suspendida que se vuelve a habilitar.
+CUIT duplicado y la ONG suspendida que se vuelve a habilitar. La carpeta de compromisos crea una
+emergencia nueva en cada corrida, la libera por ONG y la finaliza, y la prueba de concurrencia
+libera lo que comprometió: así se puede volver a correr sin ir agotando el stock. La carpeta de
+evaluación todavía usa `emergencia_id` fijos y deja comprometidos 2 paramédicos de Cruz
+Solidaria; el seed los repone en el próximo deploy.
 
 Datos de demostración del padrón: las mismas organizaciones, CUIT y tipo que la aplicación web
 (Bomberos Voluntarios de La Plata también es ONG), todas `habilitada` salvo
@@ -579,8 +583,10 @@ proceso:
   [`POST /ofertas/evaluacion`](docs/contratos/evaluacion-ofertas.md) evalúa las ofertas por ítem
   y registra los compromisos de recursos no consumibles aceptados. Luego,
   [`POST /recursos/compromisos`](docs/contratos/compromisos.md) permite comprometer los recursos
-  seleccionados por el proceso. El endpoint de finalización registra el cierre de cada ONG y
-  libera el proyecto cuando todas terminan.
+  seleccionados por el proceso. La liberación por ONG
+  (`POST /recursos/compromisos/{id}/ongs/{cuit}/liberacion`) devuelve el stock de una ONG
+  descartada, y la finalización global (`POST /recursos/compromisos/{id}/finalizacion`) cierra la
+  emergencia y libera lo que quede comprometido.
 
 ## Problemas conocidos
 

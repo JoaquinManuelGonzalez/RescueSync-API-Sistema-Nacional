@@ -657,7 +657,84 @@
           ]
         },
         {
-          "name": "Disponibilidad global de agua",
+          "name": "Disponibilidad global de personal médico",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recursos/disponibilidad?tipo=personal_medico&pagina=1&por_pagina=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recursos",
+                "disponibilidad"
+              ],
+              "query": [
+                {
+                  "key": "tipo",
+                  "value": "personal_medico"
+                },
+                {
+                  "key": "pagina",
+                  "value": "1"
+                },
+                {
+                  "key": "por_pagina",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Consulta el total, los compromisos activos y la disponibilidad actual de los recursos de personal médico. Solo se listan recursos no consumibles: la API no lleva stock de los consumibles. Para cada recurso, total = disponible + comprometido.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200 con disponibilidad paginada\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const cuerpo = pm.response.json();",
+                  "  pm.expect(cuerpo).to.have.all.keys(\"elementos\", \"pagina\", \"por_pagina\", \"total\");",
+                  "  pm.expect(cuerpo.elementos).to.be.an(\"array\").that.is.not.empty;",
+                  "});",
+                  "pm.test(\"Lista solo recursos no consumibles del tipo pedido\", () => {",
+                  "  pm.response.json().elementos.forEach((recurso) => {",
+                  "    pm.expect(recurso.tipo).to.eql(\"personal_medico\");",
+                  "    pm.expect(recurso.consumible).to.eql(false);",
+                  "  });",
+                  "});",
+                  "pm.test(\"total = disponible + comprometido\", () => {",
+                  "  pm.response.json().elementos.forEach((recurso) => {",
+                  "    pm.expect(recurso.disponible).to.be.at.least(0);",
+                  "    pm.expect(recurso.comprometido).to.be.at.least(0);",
+                  "    pm.expect(recurso.total).to.eql(recurso.disponible + recurso.comprometido);",
+                  "  });",
+                  "});",
+                  "pm.test(\"Guarda el ID de un ítem del catálogo\", () => {",
+                  "  const items = pm.response.json().elementos;",
+                  "  if (items.length > 0) {",
+                  "    pm.collectionVariables.set(\"itemId\", items[0].id);",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Disponibilidad de agua (consumible): no se lista",
           "request": {
             "method": "GET",
             "header": [],
@@ -685,7 +762,7 @@
                 }
               ]
             },
-            "description": "Consulta el total histórico, los compromisos activos y la disponibilidad actual de recursos de tipo agua.",
+            "description": "El agua es consumible: la API no lleva su stock, así que la consulta de disponibilidad no la lista y la respuesta llega vacía.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -703,27 +780,11 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Responde 200 con disponibilidad paginada\", () => {",
+                  "pm.test(\"Responde 200 sin recursos\", () => {",
                   "  pm.response.to.have.status(200);",
                   "  const cuerpo = pm.response.json();",
-                  "  pm.expect(cuerpo).to.have.all.keys(\"elementos\", \"pagina\", \"por_pagina\", \"total\");",
-                  "  pm.expect(cuerpo.elementos).to.be.an(\"array\");",
-                  "});",
-                  "pm.test(\"Cada recurso expone consumible, totales y disponible\", () => {",
-                  "  pm.response.json().elementos.forEach((recurso) => {",
-                  "    pm.expect(recurso.tipo).to.eql(\"agua\");",
-                  "    pm.expect(recurso.consumible).to.be.a(\"boolean\");",
-                  "    pm.expect(recurso.total).to.be.a(\"number\");",
-                  "    pm.expect(recurso.comprometido).to.be.a(\"number\");",
-                  "    pm.expect(recurso.disponible).to.be.a(\"number\");",
-                  "    pm.expect(recurso.disponible).to.be.at.least(0);",
-                  "  });",
-                  "});",
-                  "pm.test(\"Guarda el ID de un ítem del catálogo\", () => {",
-                  "  const items = pm.response.json().elementos;",
-                  "  if (items.length > 0) {",
-                  "    pm.collectionVariables.set(\"itemId\", items[0].id);",
-                  "  }",
+                  "  pm.expect(cuerpo.elementos).to.be.an(\"array\").that.is.empty;",
+                  "  pm.expect(cuerpo.total).to.eql(0);",
                   "});"
                 ]
               }
@@ -749,7 +810,7 @@
               "query": [
                 {
                   "key": "pagina",
-                  "value": ""
+                  "value": "1"
                 },
                 {
                   "key": "por_pagina",
@@ -757,7 +818,7 @@
                 }
               ]
             },
-            "description": "Consulta los recursos disponibles de Cruz Solidaria, identificada por su CUIT.",
+            "description": "Disponibilidad de los recursos no consumibles de Cruz Solidaria. Los consumibles no se listan.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -781,10 +842,11 @@
                   "  pm.expect(cuerpo).to.have.all.keys(\"elementos\", \"pagina\", \"por_pagina\", \"total\");",
                   "  pm.expect(cuerpo.elementos).to.be.an(\"array\");",
                   "});",
-                  "pm.test(\"Cada recurso incluye consumible y disponibilidad\", () => {",
+                  "pm.test(\"Solo no consumibles, con total = disponible + comprometido\", () => {",
                   "  pm.response.json().elementos.forEach((recurso) => {",
-                  "    pm.expect(recurso.consumible).to.be.a(\"boolean\");",
+                  "    pm.expect(recurso.consumible).to.eql(false);",
                   "    pm.expect(recurso.disponible).to.be.at.least(0);",
+                  "    pm.expect(recurso.total).to.eql(recurso.disponible + recurso.comprometido);",
                   "  });",
                   "});"
                 ]
@@ -1539,7 +1601,7 @@
     },
     {
       "name": "6. Compromiso/Liberacion",
-      "description": "Endpoints de control de concurrencia, bloqueo transaccional y cierre bilateral de proyectos.",
+      "description": "Compromiso de recursos con control de concurrencia, liberación por ONG y finalización global de la emergencia. Correr la carpeta completa: el compromiso crea una emergencia nueva en cada corrida y la finalización devuelve su stock.",
       "item": [
         {
           "name": "Compromiso",
@@ -1826,17 +1888,17 @@
           ]
         },
         {
-          "name": "Liberacion",
+          "name": "Liberación por ONG",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "X-Correlation-Id",
-                "value": "postman-corr-liberacion"
+                "value": "postman-corr-liberacion-ong"
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/recursos/compromisos/{{emergenciaPostmanId}}/ongs/30-65432198-7/finalizacion",
+              "raw": "{{baseUrl}}/recursos/compromisos/{{emergenciaPostmanId}}/ongs/30-65432198-7/liberacion",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1846,10 +1908,10 @@
                 "{{emergenciaPostmanId}}",
                 "ongs",
                 "30-65432198-7",
-                "finalizacion"
+                "liberacion"
               ]
             },
-            "description": "Reporta la finalización de actividades de una ONG. Cierra el proyecto cuando todas terminan y devuelve al inventario solo bienes no consumibles.",
+            "description": "Libera el compromiso de Cruz Solidaria en la emergencia, como cuando el proceso descarta su oferta. Devuelve al inventario los no consumibles (los 2 paramédicos).",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -1867,12 +1929,67 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Finalización y cierre exitoso con 200\", () => {",
+                  "pm.test(\"Responde 200 con el compromiso de la ONG liberado\", () => {",
                   "  pm.response.to.have.status(200);",
                   "  const json = pm.response.json();",
                   "  pm.expect(json.emergencia_externa_id).to.eql(pm.collectionVariables.get(\"emergenciaPostmanId\"));",
-                  "  pm.expect(json.identificador_nacional).to.eql(\"30-65432198-7\");",
+                  "  pm.expect(json.repetido).to.eql(false);",
+                  "  pm.expect(json.compromisos).to.have.lengthOf(1);",
+                  "  pm.expect(json.compromisos[0].identificador_nacional).to.eql(\"30-65432198-7\");",
+                  "  pm.expect(json.compromisos[0].estado).to.eql(\"LIBERADO\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Finalización global",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "postman-corr-finalizacion"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/recursos/compromisos/{{emergenciaPostmanId}}/finalizacion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "recursos",
+                "compromisos",
+                "{{emergenciaPostmanId}}",
+                "finalizacion"
+              ]
+            },
+            "description": "Cierra la emergencia cuando el proceso confirma que terminaron todas las tareas. Como el compromiso de la ONG ya se liberó, cierra sin volver a sumar inventario.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenBonita}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Responde 200 y cierra la emergencia\", () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.emergencia_externa_id).to.eql(pm.collectionVariables.get(\"emergenciaPostmanId\"));",
                   "  pm.expect(json.proyecto_cerrado).to.eql(true);",
+                  "  pm.expect(json.repetido).to.eql(false);",
+                  "  pm.expect(json.organizaciones_participantes).to.eql(1);",
                   "});"
                 ]
               }
@@ -1915,7 +2032,7 @@
                   "const b = pm.response.json();",
                   "const items = b.elementos || b.items || [];",
                   "const voluntarios = items.find(i => i.nombre === \"Voluntarios generales\") || { disponible: 40 };",
-                  "const disponible = voluntarios.disponible || 40;",
+                  "const disponible = voluntarios.disponible ?? 40;",
                   "const cantidad = Math.floor(disponible / 2) + 1;",
                   "",
                   "const baseUrl = pm.environment.get(\"baseUrl\") || \"http://localhost:8000\";",
@@ -1983,7 +2100,7 @@
                   "  const ganador = resultados.find(r => r.code === 201);",
                   "  if (ganador) {",
                   "    const liberar = {",
-                  "      url: baseUrl + \"/recursos/compromisos/\" + ganador.id + \"/ongs/30-99999999-6/finalizacion\",",
+                  "      url: baseUrl + \"/recursos/compromisos/\" + ganador.id + \"/liberacion\",",
                   "      method: \"POST\",",
                   "      header: {",
                   "        \"Authorization\": \"Bearer \" + token",
@@ -1991,7 +2108,7 @@
                   "    };",
                   "    pm.sendRequest(liberar, (err, res) => {",
                   "      pm.test(\"Recurso no consumible liberado tras prueba de concurrencia\", () => {",
-                  "        pm.expect([200, 204]).to.include(res.code);",
+                  "        pm.expect(res.code).to.eql(200);",
                   "      });",
                   "    });",
                   "  }",
