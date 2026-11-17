@@ -87,7 +87,9 @@ cambiaron las organizaciones o cantidades. Los compromisos liberados existentes 
 una emergencia finalizada globalmente no admite nuevos compromisos.
 
 En los endpoints que siguen, `{emergencia_externa_id}` también es un UUID: con otro formato la
-ruta no existe y la API responde 404.
+ruta no existe y la API responde 404. Los compromisos registrados antes de pasar a UUID (con ids
+como `14` o `emergencia-postman-01`) quedaron cerrados por la migración `8c3f1e5a7b20`: figuran
+como `LIBERADO` y no cuentan como comprometidos en la disponibilidad.
 
 ## `POST /recursos/compromisos/{emergencia_externa_id}/liberacion`
 

@@ -168,7 +168,8 @@ migrations/             migraciones de Alembic (0001: línea base;
                         b8e41c7d2f90: cuentas y estado de habilitación;
                         c0ebb05602a1: merge de ramas;
                         4a7c2d9e1f63: cierre global de emergencia y liberación de recursos;
-                        5b9d3e7a1c42: claves UUID en todas las tablas, conservando los datos)
+                        5b9d3e7a1c42: claves UUID en todas las tablas, conservando los datos;
+                        8c3f1e5a7b20: cierre de los compromisos de emergencias sin UUID)
 tests/                  tests con pytest (SQLite en memoria)
 docs/adr/               decisiones de arquitectura
 docs/contratos/         contratos de autenticación, configuración, errores y logging

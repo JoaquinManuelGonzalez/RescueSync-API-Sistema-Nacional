@@ -77,7 +77,10 @@ class Compromiso(db.Model):
         "id_emergencia_externa",
         String(255),
         nullable=False,
-        comment="Identificador opaco de la emergencia en RescueSync o Bonita.",
+        comment=(
+            "UUID canónico de la emergencia en la aplicación web. Los compromisos anteriores a "
+            "5b9d3e7a1c42 pueden tener otro formato."
+        ),
     )
     nivel_gravedad: Mapped[NivelGravedad] = mapped_column(
         Enum(
