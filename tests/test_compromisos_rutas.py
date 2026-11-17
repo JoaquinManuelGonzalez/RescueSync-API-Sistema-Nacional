@@ -258,14 +258,18 @@ def test_liberar_recursos_requiere_rol_sistema(cliente, cabeceras):
     assert respuesta.status_code == 403
 
 
-def test_liberar_recursos_sin_compromisos_responde_404(cliente, cabeceras):
+def test_liberar_recursos_sin_compromisos_responde_200_vacio(cliente, cabeceras):
     respuesta = cliente.post(
-        "/recursos/compromisos/emergencia-inexistente/liberacion",
+        "/recursos/compromisos/emergencia-sin-compromisos/liberacion",
         headers=cabeceras(Rol.sistema),
     )
 
-    assert respuesta.status_code == 404
-    assert respuesta.get_json()["error"]["codigo"] == "RECURSO_NO_ENCONTRADO"
+    assert respuesta.status_code == 200
+    assert respuesta.get_json() == {
+        "emergencia_externa_id": "emergencia-sin-compromisos",
+        "repetido": False,
+        "compromisos": [],
+    }
 
 
 def test_liberar_recursos_de_ong_es_idempotente(cliente, cabeceras, inventario_disponible):

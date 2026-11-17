@@ -129,13 +129,9 @@ class LiberacionDeRecursos(MethodView):
         RespuestaLiberacion,
         description=(
             "Libera todos los compromisos de una emergencia; repetir la solicitud no "
-            "reintegra inventario nuevamente."
+            "reintegra inventario nuevamente. Si la emergencia no tiene compromisos, responde "
+            "200 con `compromisos: []`: no hay nada que liberar."
         ),
-    )
-    @blueprint_compromisos.alt_response(
-        404,
-        schema=RespuestaError,
-        description="No hay compromisos registrados para la emergencia indicada.",
     )
     @blueprint_compromisos.alt_response(
         409,

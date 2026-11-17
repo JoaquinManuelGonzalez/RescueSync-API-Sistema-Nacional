@@ -577,7 +577,12 @@ def _liberar_compromisos_bloqueados(compromisos: list[Compromiso]) -> None:
 
 
 def liberar_recursos(*, emergencia_externa_id: str) -> ResultadoLiberacion:
-    """Libera los compromisos de una emergencia y devuelve solo recursos no consumibles."""
+    """Libera los compromisos de una emergencia y devuelve solo recursos no consumibles.
+
+    El proceso la usa al reiniciar la convocatoria para asegurarse de que no quede nada reservado,
+    así que una emergencia sin compromisos (la primera vuelta solo tuvo consumibles, todo se
+    rechazó o no hubo ofertas) no es un error: no hay nada que liberar y se responde vacío.
+    """
     emergencia_id = emergencia_externa_id.strip()
     if not emergencia_id:
         raise ReglaDeNegocioIncumplida("La emergencia externa debe identificarse.")
@@ -592,10 +597,7 @@ def liberar_recursos(*, emergencia_externa_id: str) -> ResultadoLiberacion:
             .with_for_update()
         ).all()
         if not compromisos:
-            raise RecursoNoEncontrado(
-                "No se encontraron compromisos para la emergencia indicada.",
-                detalle={"emergencia_externa_id": emergencia_id},
-            )
+            return ResultadoLiberacion((), repetido=False)
 
         if all(compromiso.estado is EstadoCompromiso.liberado for compromiso in compromisos):
             return ResultadoLiberacion(tuple(compromisos), repetido=True)

@@ -244,9 +244,14 @@ def test_liberar_recursos_devuelve_solo_los_no_consumibles(base_de_datos):
     } == cantidades
 
 
-def test_liberar_recursos_falla_si_no_hay_compromisos(base_de_datos):
-    with pytest.raises(RecursoNoEncontrado):
-        liberar_recursos(emergencia_externa_id="inexistente")
+def test_liberar_recursos_sin_compromisos_no_hace_nada(base_de_datos):
+    # Reinicio tras una vuelta que no comprometió nada (solo consumibles o todo rechazado).
+    resultado = liberar_recursos(emergencia_externa_id="inexistente")
+
+    assert resultado.compromisos == ()
+    assert resultado.repetido is False
+    assert db.session.query(Compromiso).count() == 0
+    assert [fila.cantidad_disponible for fila in db.session.query(InventarioItem)] == [10, 8]
 
 
 def test_reinicio_permite_comprometer_nuevos_aportes_tras_liberacion_global(base_de_datos):

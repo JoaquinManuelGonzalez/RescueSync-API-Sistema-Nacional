@@ -92,11 +92,15 @@ Responde `200 OK` con los compromisos liberados. El campo `repetido` es `true` s
 liberados, y los reintentos no vuelven a incrementar el inventario. Si ya hubo liberaciones
 selectivas, libera los compromisos activos restantes sin volver a reintegrar los ya liberados.
 
+Si la emergencia no tiene compromisos, también responde `200 OK`, con `"compromisos": []` y
+`"repetido": false`. Es el caso habitual al reiniciar tras una vuelta que no comprometió nada
+(solo hubo consumibles, se rechazó todo o no hubo ofertas): el proceso usa esta llamada para
+asegurarse de que no quede nada reservado, y el conector de Bonita falla ante cualquier 4xx.
+
 | HTTP | Código | Significado |
 |---|---|---|
-| 200 | — | Recursos liberados o solicitud repetida |
+| 200 | — | Recursos liberados, solicitud repetida o nada que liberar |
 | 401 / 403 | `NO_AUTENTICADO` / `PERMISO_DENEGADO` | Token ausente/inválido o rol distinto de `sistema` |
-| 404 | `RECURSO_NO_ENCONTRADO` | No hay compromisos para la emergencia |
 | 409 | `CONFLICTO_DE_ESTADO` | El estado actual de los compromisos impide liberar |
 
 ## `POST /recursos/compromisos/{emergencia_externa_id}/ongs/{identificador_nacional}/liberacion`
