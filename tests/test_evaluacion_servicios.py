@@ -281,3 +281,52 @@ def test_evaluacion_encuentra_la_ong_con_cuit_sin_guiones(base_de_datos):
     assert aporte["identificador_nacional"] == "30333333333"
     compromiso = db.session.query(Compromiso).one()
     assert compromiso.organizacion.identificador_nacional == "30-33333333-3"
+
+
+def test_evaluacion_suma_el_mismo_recurso_de_una_ong_pedido_en_dos_lotes(base_de_datos):
+    organizacion = _ong_con_ambulancias(stock=5)
+    cuit = organizacion.identificador_nacional
+
+    resultado = evaluar_ofertas(
+        emergencia_id=22,
+        nivel_gravedad="ALTA",
+        ofertas=[
+            _oferta(
+                [
+                    _item_ofertado([_aporte(cuit, 2)], lote_item_id=10),
+                    _item_ofertado([_aporte(cuit, 3)], lote_item_id=11),
+                ]
+            )
+        ],
+    )
+
+    aportes = [item["aportes"][0] for item in resultado["ofertas"][0]["items"]]
+    assert [aporte["clasificacion"] for aporte in aportes] == ["principal", "principal"]
+    assert all(aporte["compromiso_registrado"] for aporte in aportes)
+    compromiso = db.session.query(Compromiso).one()
+    assert [item.cantidad_comprometida for item in compromiso.items] == [5]
+    assert db.session.query(InventarioItem).one().cantidad_disponible == 0
+
+
+def test_evaluacion_controla_el_stock_acumulado_entre_lineas_de_una_ong(base_de_datos):
+    organizacion = _ong_con_ambulancias(stock=5)
+    cuit = organizacion.identificador_nacional
+
+    resultado = evaluar_ofertas(
+        emergencia_id=23,
+        nivel_gravedad="ALTA",
+        ofertas=[
+            _oferta([_item_ofertado([_aporte(cuit, 3)], lote_item_id=10)], oferta_id=1),
+            _oferta([_item_ofertado([_aporte(cuit, 3)], lote_item_id=11)], oferta_id=2),
+        ],
+    )
+
+    primero = resultado["ofertas"][0]["items"][0]["aportes"][0]
+    segundo = resultado["ofertas"][1]["items"][0]["aportes"][0]
+    assert primero["clasificacion"] == "principal"
+    assert segundo["clasificacion"] == "rechazada"
+    assert "(2 disponible)" in segundo["motivo"]
+    assert segundo["compromiso_registrado"] is False
+    compromiso = db.session.query(Compromiso).one()
+    assert [item.cantidad_comprometida for item in compromiso.items] == [3]
+    assert db.session.query(InventarioItem).one().cantidad_disponible == 2

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
+from dataclasses import replace
+
 from sqlalchemy import select
 
 from app.core.errores import RecursoNoEncontrado, SolicitudInvalida
@@ -95,7 +98,11 @@ def _evaluar_aporte(
     aporte: dict,
     recurso: Item,
     requerido: NivelCertificacion,
+    reservado: defaultdict[int, int],
 ) -> tuple[dict, AporteSolicitado | None]:
+    """Clasifica un aporte. `reservado` acumula, por fila de inventario, lo ya aceptado en esta
+    evaluación: la misma ONG puede ofrecer el mismo recurso en varias líneas (un ítem pedido en
+    dos lotes) y entre todas no pueden superar su stock."""
     # La respuesta repite el identificador tal como llegó (recortado), porque la web cruza el
     # resultado por ese dato; para buscar en el padrón se usa la forma normalizada.
     recibido = aporte["identificador_nacional"]
@@ -140,13 +147,19 @@ def _evaluar_aporte(
             ),
             None,
         )
-        disponible = inventario_item.cantidad_disponible if inventario_item else 0
+        disponible = (
+            inventario_item.cantidad_disponible - reservado[inventario_item.id]
+            if inventario_item
+            else 0
+        )
         if disponible < aporte["cantidad"]:
             clasificacion = CLASIFICACION_RECHAZADA
             motivo = (
                 "La disponibilidad del ítem no alcanza la cantidad ofertada "
                 f"({disponible} disponible)."
             )
+        else:
+            reservado[inventario_item.id] += aporte["cantidad"]
 
     compromiso = clasificacion != CLASIFICACION_RECHAZADA and not recurso.consumible
     aporte_evaluado = {
@@ -174,6 +187,7 @@ def _evaluar_aporte(
 def _evaluar_item(
     item_oferta: dict,
     requerido: NivelCertificacion,
+    reservado: defaultdict[int, int],
 ) -> tuple[dict, list[AporteSolicitado]]:
     codigo = item_oferta["codigo_recurso"].strip()
     recurso = db.session.scalar(select(Item).where(Item.codigo_recurso == codigo))
@@ -186,7 +200,7 @@ def _evaluar_item(
     aportes_evaluados = []
     aportes_comprometidos = []
     for aporte in item_oferta["aportes"]:
-        evaluado, comprometido = _evaluar_aporte(aporte, recurso, requerido)
+        evaluado, comprometido = _evaluar_aporte(aporte, recurso, requerido, reservado)
         aportes_evaluados.append(evaluado)
         if comprometido is not None:
             aportes_comprometidos.append(comprometido)
@@ -200,6 +214,27 @@ def _evaluar_item(
         },
         aportes_comprometidos,
     )
+
+
+def _sumar_por_organizacion_y_recurso(
+    aportes: list[AporteSolicitado],
+) -> list[AporteSolicitado]:
+    """Une en un solo aporte lo aceptado de una misma ONG y recurso en líneas distintas.
+
+    En el Sistema Nacional hay un ítem de compromiso por ONG y recurso, y
+    `comprometer_recursos` rechaza la repetición. La clasificación de esas líneas coincide
+    siempre (misma ONG, mismo tipo de recurso, misma gravedad), así que se conserva la primera.
+    """
+    sumados: dict[tuple[str, str], AporteSolicitado] = {}
+    for aporte in aportes:
+        clave = (aporte.identificador_nacional, aporte.codigo_recurso)
+        previo = sumados.get(clave)
+        sumados[clave] = (
+            aporte
+            if previo is None
+            else replace(previo, cantidad=previo.cantidad + aporte.cantidad)
+        )
+    return list(sumados.values())
 
 
 def evaluar_ofertas(
@@ -221,10 +256,11 @@ def evaluar_ofertas(
 
     evaluadas = []
     aportes_comprometidos = []
+    reservado: defaultdict[int, int] = defaultdict(int)
     for oferta in ofertas:
         items_evaluados = []
         for item in oferta["items"]:
-            evaluado, comprometidos = _evaluar_item(item, requerido)
+            evaluado, comprometidos = _evaluar_item(item, requerido, reservado)
             items_evaluados.append(evaluado)
             aportes_comprometidos.extend(comprometidos)
 
@@ -241,7 +277,7 @@ def evaluar_ofertas(
         comprometer_recursos(
             emergencia_externa_id=str(emergencia_id),
             nivel_gravedad=nivel_compromiso,
-            aportes=aportes_comprometidos,
+            aportes=_sumar_por_organizacion_y_recurso(aportes_comprometidos),
         )
     return {
         "emergencia_id": emergencia_id,

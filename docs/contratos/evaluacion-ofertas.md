@@ -74,3 +74,8 @@ la cantidad disponible se valida contra el inventario de la organización. Cada 
 aceptado (`principal` o `apoyo`) se registra mediante el mismo servicio transaccional que usa
 `POST /recursos/compromisos`; por eso el descuento de stock es atómico e idempotente por
 emergencia.
+
+Una misma ONG puede ofrecer el mismo recurso en varias líneas de la convocatoria, por ejemplo si
+el ítem se pidió en dos lotes. Cada línea se evalúa contra el stock que queda después de las
+anteriores, en el orden en que llegan, y la que ya no entra sale `rechazada` con el disponible
+restante en el motivo. Lo aceptado se compromete sumado en un único ítem por ONG y recurso.
