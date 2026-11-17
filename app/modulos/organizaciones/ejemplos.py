@@ -54,16 +54,6 @@ EJEMPLO_CATALOGO_CERTIFICACIONES = {
 EJEMPLO_RECURSOS_DISPONIBLES = {
     "elementos": [
         {
-            "comprometido": 0,
-            "consumible": True,
-            "disponible": 100,
-            "id": 0,
-            "nombre": "Agua potable envasada",
-            "tipo": "agua",
-            "total": 100,
-            "unidad_medida": "litros",
-        },
-        {
             "comprometido": 1,
             "consumible": False,
             "disponible": 19,
@@ -71,6 +61,16 @@ EJEMPLO_RECURSOS_DISPONIBLES = {
             "nombre": "Enfermeros",
             "tipo": "personal_medico",
             "total": 20,
+            "unidad_medida": "personas",
+        },
+        {
+            "comprometido": 21,
+            "consumible": False,
+            "disponible": 19,
+            "id": 5,
+            "nombre": "Voluntarios generales",
+            "tipo": "otro",
+            "total": 40,
             "unidad_medida": "personas",
         },
     ],
@@ -91,20 +91,10 @@ EJEMPLO_DISPONIBILIDAD_ONG = {
             "total": 10,
             "unidad_medida": "personas",
         },
-        {
-            "comprometido": 0,
-            "consumible": True,
-            "disponible": 100,
-            "id": 18,
-            "nombre": "Raciones de alimento no perecedero",
-            "tipo": "alimentos",
-            "total": 100,
-            "unidad_medida": "raciones",
-        },
     ],
     "pagina": 1,
     "por_pagina": 20,
-    "total": 2,
+    "total": 1,
 }
 
 EJEMPLO_CARGA_DE_INVENTARIO = {

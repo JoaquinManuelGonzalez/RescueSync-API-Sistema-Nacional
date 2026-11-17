@@ -10,6 +10,11 @@ from app.modulos.compromisos.modelos import (
     NivelGravedad,
     TipoAsignacion,
 )
+from app.modulos.compromisos.servicios import (
+    AporteSolicitado,
+    comprometer_recursos,
+    liberar_recursos,
+)
 from app.modulos.organizaciones.modelos import (
     Certificacion,
     EstadoHabilitacion,
@@ -108,10 +113,11 @@ def test_disponibilidad_expone_inventario_y_compromisos_activos(base_de_datos, c
         identificador_nacional="30-12345678-9",
     )
     item = Item(
-        codigo_recurso="RSR-AGUA-CONSULTA",
-        nombre="Agua",
-        tipo=TipoItem.agua,
-        unidad_medida="litros",
+        codigo_recurso="RSR-GENERADOR-CONSULTA",
+        nombre="Generador",
+        tipo=TipoItem.maquinaria,
+        unidad_medida="unidades",
+        consumible=False,
     )
     inventario_item = InventarioItem(cantidad_disponible=7, item=item)
     organizacion.inventario = Inventario(items=[inventario_item])
@@ -145,7 +151,7 @@ def test_disponibilidad_expone_inventario_y_compromisos_activos(base_de_datos, c
     db.session.commit()
 
     respuesta = cliente.get(
-        "/recursos/disponibilidad?tipo=agua",
+        "/recursos/disponibilidad?tipo=maquinaria",
         headers=cabeceras(),
     )
 
@@ -153,10 +159,10 @@ def test_disponibilidad_expone_inventario_y_compromisos_activos(base_de_datos, c
     assert respuesta.get_json()["elementos"] == [
         {
             "id": item.id,
-            "nombre": "Agua",
-            "tipo": "agua",
-            "unidad_medida": "litros",
-            "consumible": True,
+            "nombre": "Generador",
+            "tipo": "maquinaria",
+            "unidad_medida": "unidades",
+            "consumible": False,
             "total": 10,
             "comprometido": 3,
             "disponible": 7,
@@ -182,6 +188,7 @@ def test_disponibilidad_de_una_organizacion_filtra_sus_recursos(base_de_datos, c
         nombre="Generador",
         tipo=TipoItem.maquinaria,
         unidad_medida="unidades",
+        consumible=False,
     )
     organizacion.inventario = Inventario(items=[InventarioItem(cantidad_disponible=4, item=item)])
     otro_item = Item(
@@ -216,3 +223,93 @@ def test_disponibilidad_de_organizacion_inexistente_responde_404(base_de_datos, 
     )
 
     assert respuesta.status_code == 404
+
+
+def _ong_con_agua_y_voluntarios() -> Organizacion:
+    organizacion = Organizacion(
+        tipo=TipoOrganizacion.ong,
+        nombre="ONG mixta",
+        mail_contacto="mixta@example.com",
+        identificador_nacional="30-12345678-9",
+        estado_habilitacion=EstadoHabilitacion.habilitada,
+    )
+    agua = Item(
+        codigo_recurso="RSR-AGUA-MIXTA",
+        nombre="Agua",
+        tipo=TipoItem.agua,
+        unidad_medida="litros",
+        consumible=True,
+    )
+    voluntarios = Item(
+        codigo_recurso="RSR-VOLUNTARIOS-MIXTA",
+        nombre="Voluntarios",
+        tipo=TipoItem.otro,
+        unidad_medida="personas",
+        consumible=False,
+    )
+    organizacion.inventario = Inventario(
+        items=[
+            InventarioItem(item=agua, cantidad_disponible=1000),
+            InventarioItem(item=voluntarios, cantidad_disponible=40),
+        ]
+    )
+    db.session.add(organizacion)
+    db.session.commit()
+    return organizacion
+
+
+def _voluntarios(total: int, comprometido: int, disponible: int) -> dict:
+    return {
+        "nombre": "Voluntarios",
+        "consumible": False,
+        "total": total,
+        "comprometido": comprometido,
+        "disponible": disponible,
+    }
+
+
+def _resumen(respuesta) -> list[dict]:
+    claves = ("nombre", "consumible", "total", "comprometido", "disponible")
+    return [{clave: fila[clave] for clave in claves} for fila in respuesta.get_json()["elementos"]]
+
+
+def test_disponibilidad_lista_solo_no_consumibles_y_sigue_un_compromiso(
+    base_de_datos, cliente, cabeceras
+):
+    _ong_con_agua_y_voluntarios()
+    comprometer_recursos(
+        emergencia_externa_id="emergencia-mixta",
+        nivel_gravedad="ALTA",
+        aportes=[
+            AporteSolicitado(
+                "30-12345678-9", "RSR-VOLUNTARIOS-MIXTA", 21, TipoAsignacion.principal
+            ),
+            AporteSolicitado("30-12345678-9", "RSR-AGUA-MIXTA", 100, TipoAsignacion.principal),
+        ],
+    )
+
+    global_ = cliente.get("/recursos/disponibilidad", headers=cabeceras())
+    de_la_ong = cliente.get("/ongs/30-12345678-9/recursos/disponibilidad", headers=cabeceras())
+
+    # El agua es consumible: no aparece, aunque tenga 100 L comprometidos.
+    assert _resumen(global_) == [_voluntarios(40, 21, 19)]
+    assert global_.get_json()["total"] == 1
+    assert _resumen(de_la_ong) == [_voluntarios(40, 21, 19)]
+    assert de_la_ong.get_json()["total"] == 1
+
+    liberar_recursos(emergencia_externa_id="emergencia-mixta")
+
+    despues = cliente.get("/recursos/disponibilidad", headers=cabeceras())
+    assert _resumen(despues) == [_voluntarios(40, 0, 40)]
+
+
+def test_disponibilidad_filtrada_por_un_tipo_consumible_queda_vacia(
+    base_de_datos, cliente, cabeceras
+):
+    _ong_con_agua_y_voluntarios()
+
+    respuesta = cliente.get("/recursos/disponibilidad?tipo=agua", headers=cabeceras())
+
+    assert respuesta.status_code == 200
+    assert respuesta.get_json()["elementos"] == []
+    assert respuesta.get_json()["total"] == 0

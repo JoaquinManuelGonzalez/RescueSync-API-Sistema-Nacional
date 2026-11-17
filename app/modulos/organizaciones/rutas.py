@@ -182,10 +182,13 @@ class DisponibilidadGlobal(MethodView):
         200,
         DisponibilidadPaginadaSchema,
         example=EJEMPLO_RECURSOS_DISPONIBLES,
-        description="Sin aplicar filtro, muestra todos los recursos disponibles de todas las ONGs.",
+        description=(
+            "Sin aplicar filtro, muestra los recursos no consumibles de todas las ONGs. Los "
+            "consumibles no se listan: la API no lleva su stock, así que no tienen disponibilidad."
+        ),
     )
     def get(self, args):
-        """Consultar la disponibilidad global de recursos con filtro por tipo."""
+        """Consultar la disponibilidad global de recursos no consumibles con filtro por tipo."""
         pagina = args["pagina"]
         por_pagina = args["por_pagina"]
         total_subconsulta = (
@@ -229,20 +232,13 @@ class DisponibilidadGlobal(MethodView):
                 comprometido_subconsulta,
                 comprometido_subconsulta.c.item_id == Item.id,
             )
+            .where(Item.consumible.is_(False))
         )
         if args["tipo"] is not None:
             consulta = consulta.where(Item.tipo == args["tipo"])
 
         total = (
-            db.session.scalar(
-                select(func.count()).select_from(
-                    select(Item.id)
-                    .join(InventarioItem, InventarioItem.item_id == Item.id)
-                    .where(args["tipo"] is None or Item.tipo == args["tipo"])
-                    .group_by(Item.id)
-                    .subquery()
-                )
-            )
+            db.session.scalar(select(func.count()).select_from(consulta.order_by(None).subquery()))
             or 0
         )
         filas = db.session.execute(
@@ -274,7 +270,10 @@ class DisponibilidadDeOrganizacion(MethodView):
         200,
         DisponibilidadPaginadaSchema,
         example=EJEMPLO_DISPONIBILIDAD_ONG,
-        description="Sin filtro por tipo, muestra todos los recursos disponibles de una ONG.",
+        description=(
+            "Sin filtro por tipo, muestra los recursos no consumibles de una ONG. Los consumibles "
+            "no se listan: la API no lleva su stock, así que no tienen disponibilidad."
+        ),
     )
     @blueprint_organizaciones.alt_response(
         404,
@@ -288,7 +287,7 @@ class DisponibilidadDeOrganizacion(MethodView):
         example=EJEMPLO_ERROR_400_CUIT,
     )
     def get(self, args, cuit):
-        """Consultar la disponibilidad de recursos de una organización con filtro por tipo."""
+        """Consultar la disponibilidad de recursos no consumibles de una ONG con filtro por tipo."""
         organizacion = servicios.obtener_por_cuit(cuit)
         pagina = args["pagina"]
         por_pagina = args["por_pagina"]
@@ -335,6 +334,7 @@ class DisponibilidadDeOrganizacion(MethodView):
                 comprometido_subconsulta,
                 comprometido_subconsulta.c.item_id == Item.id,
             )
+            .where(Item.consumible.is_(False))
         )
         if args["tipo"] is not None:
             consulta = consulta.where(Item.tipo == args["tipo"])
