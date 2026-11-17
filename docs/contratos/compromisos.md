@@ -145,6 +145,11 @@ finalizadas por la confirmación global del proceso. Devuelve al inventario solo
 consumibles; los consumibles permanecen descontados. Una llamada repetida no duplica el reintegro;
 `repetido` indica si la emergencia ya había sido cerrada.
 
+Si todos los compromisos ya estaban liberados (se descartaron todas las ONG con no consumibles, o
+hubo un reinicio y la vuelta nueva no comprometió nada), la emergencia también se cierra con
+`200 OK` y `repetido: false`, sin mover inventario. Desde ese momento no admite nuevos
+compromisos.
+
 | HTTP | Código | Significado |
 |---|---|---|
 | 200 | — | Emergencia finalizada o repetición idempotente |

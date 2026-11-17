@@ -707,11 +707,9 @@ def finalizar_emergencia(*, emergencia_externa_id: str) -> ResultadoFinalizacion
                 organizaciones_participantes=organizaciones_participantes,
                 repetido=True,
             )
-        if all(compromiso.estado is EstadoCompromiso.liberado for compromiso in compromisos):
-            raise ConflictoDeEstado(
-                "La emergencia ya fue liberada para reiniciarse, no finalizada.",
-                detalle={"emergencia_externa_id": emergencia_id},
-            )
+        # Si todo ya está liberado (se descartaron todas las ONG con no consumibles, o hubo un
+        # reinicio y la vuelta nueva no comprometió nada), igual se cierra: no se mueve
+        # inventario porque ya volvió al liberarse.
         if any(
             compromiso.estado not in (EstadoCompromiso.comprometido, EstadoCompromiso.liberado)
             for compromiso in compromisos

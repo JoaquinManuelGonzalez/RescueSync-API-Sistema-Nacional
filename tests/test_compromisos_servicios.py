@@ -487,18 +487,45 @@ def test_finalizacion_global_rechaza_emergencia_sin_compromisos(base_de_datos):
         finalizar_emergencia(emergencia_externa_id="13")
 
 
-def test_finalizacion_global_no_cierra_emergencia_ya_liberada_para_reinicio(base_de_datos):
+def test_finalizacion_global_cierra_emergencia_con_todo_liberado(base_de_datos):
+    # Reinicio y segunda vuelta sin no consumibles: todo quedó liberado antes de finalizar.
     comprometer_recursos(
         emergencia_externa_id="13",
         nivel_gravedad="MEDIA",
         aportes=aportes_validos(),
     )
     liberar_recursos(emergencia_externa_id="13")
-    db.session.commit()
 
-    with pytest.raises(ConflictoDeEstado):
-        finalizar_emergencia(emergencia_externa_id="13")
+    resultado = finalizar_emergencia(emergencia_externa_id="13")
 
+    assert resultado.repetido is False
+    assert resultado.proyecto_cerrado is True
+    assert resultado.organizaciones_participantes == 2
+    assert all(c.fecha_cierre_proyecto is not None for c in db.session.query(Compromiso))
+    # El inventario ya había vuelto al liberar: finalizar no lo vuelve a sumar.
+    assert [fila.cantidad_disponible for fila in db.session.query(InventarioItem)] == [10, 8]
+    assert finalizar_emergencia(emergencia_externa_id="13").repetido is True
+    with pytest.raises(ConflictoDeEstado, match="ya fue finalizada"):
+        comprometer_recursos(
+            emergencia_externa_id="13",
+            nivel_gravedad="MEDIA",
+            aportes=aportes_validos(),
+        )
+
+
+def test_finalizacion_global_cierra_si_se_descartaron_todas_las_ong(base_de_datos):
+    comprometer_recursos(
+        emergencia_externa_id="13",
+        nivel_gravedad="MEDIA",
+        aportes=aportes_validos(),
+    )
+    liberar_recursos_ong(emergencia_externa_id="13", identificador_nacional="30-11111111-1")
+    liberar_recursos_ong(emergencia_externa_id="13", identificador_nacional="30-22222222-2")
+
+    resultado = finalizar_emergencia(emergencia_externa_id="13")
+
+    assert resultado.repetido is False
+    assert resultado.proyecto_cerrado is True
     assert [fila.cantidad_disponible for fila in db.session.query(InventarioItem)] == [10, 8]
 
 
