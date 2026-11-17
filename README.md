@@ -260,8 +260,10 @@ los casos de la épica: 401 sin token o con token adulterado, 403 por rol, alta 
 CUIT duplicado y la ONG suspendida que se vuelve a habilitar. La carpeta de compromisos crea una
 emergencia nueva en cada corrida, la libera por ONG y la finaliza, y la prueba de concurrencia
 libera lo que comprometió: así se puede volver a correr sin ir agotando el stock. La carpeta de
-evaluación todavía usa `emergencia_id` fijos (UUID, iguales a los de Swagger) y deja
-comprometidos 2 paramédicos de Cruz Solidaria; el seed los repone en el próximo deploy.
+evaluación todavía usa `emergencia_id` fijos (UUID, iguales a los de Swagger): la primera
+corrida deja comprometidos 2 paramédicos de Cruz Solidaria en la emergencia `…000000000014` y
+las siguientes repiten ese mismo compromiso (`repetido`), sin sumar otro. Los ids de las
+entidades son UUID ([ADR-006](docs/adr/ADR-006-claves-uuid.md)).
 
 Datos de demostración del padrón: las mismas organizaciones, CUIT y tipo que la aplicación web
 (Bomberos Voluntarios de La Plata también es ONG), todas `habilitada` salvo
