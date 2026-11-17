@@ -84,6 +84,10 @@ corriendo `docker compose up api`.
 - **`.env.supabase`** (opcional, solo para quien administra la base): archivo local con la
   `DATABASE_URL` de Supabase, para comandos puntuales contra la nube con `docker run
   --env-file`. Lo ignoran git y Docker (`.env.*`). No reemplaza al `.env`.
+- **Postman y documentación.** Las credenciales nunca se escriben en la colección, en los
+  entornos versionados (`docs/postman/*.postman_environment.json` llevan `contrasenaAdmin` y
+  `clientSecretBonita` vacíos), en el manual de pruebas ni en el README. Las de la nube van solo en
+  el documento de la entrega.
 - **No se usan como `ARG` en el Dockerfile.** Render convierte las variables de entorno en build
   args, y un `ARG` con un secreto quedaría grabado en la imagen.
 - **Si un secreto se filtra**, se rota de inmediato en el sistema correspondiente (Render,

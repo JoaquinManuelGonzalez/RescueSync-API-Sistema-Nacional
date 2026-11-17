@@ -265,6 +265,11 @@ class ValidacionDeRestricciones(MethodView):
         schema=RespuestaError,
         description="No existe una organizaci\u00f3n o un c\u00f3digo de recurso indicado.",
     )
+    @blueprint_compromisos.alt_response(
+        422,
+        schema=RespuestaError,
+        description="La solicitud repite una organizaci\u00f3n y un recurso.",
+    )
     def post(self, datos):
         """Verificar si los aportes pueden comprometerse sin modificar el inventario.
 

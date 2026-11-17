@@ -33,11 +33,37 @@ class EvaluacionDeOfertas(MethodView):
         RespuestaEvaluacionSchema,
         examples=EJEMPLOS_RESPUESTA_EVALUACION,
     )
-    @blueprint_evaluacion.alt_response(400, schema=RespuestaError)
-    @blueprint_evaluacion.alt_response(404, schema=RespuestaError)
-    @blueprint_evaluacion.alt_response(422, schema=RespuestaError)
+    @blueprint_evaluacion.alt_response(
+        400,
+        schema=RespuestaError,
+        description="Cuerpo inválido, un id que no es UUID o un nivel de gravedad desconocido.",
+    )
+    @blueprint_evaluacion.alt_response(
+        404,
+        schema=RespuestaError,
+        description="Un `codigo_recurso` no existe en el catálogo: no se evalúa nada.",
+    )
+    @blueprint_evaluacion.alt_response(
+        409,
+        schema=RespuestaError,
+        description=(
+            "La emergencia ya fue finalizada, o ya tiene compromisos distintos de los que acepta "
+            "esta evaluación. Para volver a probar, usar otro `emergencia_id`."
+        ),
+    )
+    @blueprint_evaluacion.alt_response(
+        422,
+        schema=RespuestaError,
+        description="Otro pedido se llevó el stock entre la clasificación y el compromiso.",
+    )
     def post(self, datos):
-        """Evalúa ofertas y registra los compromisos de recursos no consumibles aceptados."""
+        """Evalúa ofertas y registra los compromisos de recursos no consumibles aceptados.
+
+        La evaluación **modifica datos**: los aportes no consumibles `principal` o `apoyo` quedan
+        comprometidos bajo `emergencia_id` y descuentan stock, que vuelve con la liberación o la
+        finalización de la emergencia. Repetir el mismo pedido es idempotente mientras el stock
+        que queda alcance para lo pedido.
+        """
         return servicios.evaluar_ofertas(
             emergencia_id=datos["emergencia_id"],
             nivel_gravedad=datos["nivel_gravedad"],

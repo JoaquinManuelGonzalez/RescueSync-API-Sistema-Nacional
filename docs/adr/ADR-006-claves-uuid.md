@@ -1,6 +1,6 @@
 # ADR-006: Claves UUID en todas las entidades
 
-- Estado: Aceptado
+- Estado: Propuesto
 - Fecha: 2026-11-17
 - Reemplaza a: —
 - Reemplazado por: —
@@ -27,7 +27,7 @@ personas prueban a la vez contra la misma API.
 
 Todas las claves primarias y foráneas de la API son UUID (tipo `uuid` de PostgreSQL, `Uuid` de
 SQLAlchemy), y la API exige un UUID para identificar una emergencia. La aplicación web hizo el
-mismo cambio en todas sus tablas, así que el id que viaja a Bonita y a la API no se repite entre
+mismo cambio en todas sus tablas (su ADR-011), así que el id que viaja a Bonita y a la API no se repite entre
 entornos.
 
 - **Filas nuevas: UUIDv7** (`app/core/identificadores.py:nuevo_id`, `uuid.uuid7()` de

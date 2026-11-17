@@ -66,10 +66,24 @@ usa el envelope.
 | 503 `SERVICIO_NO_DISPONIBLE` sostenido | La base no responde; en la nube, casi siempre el proyecto de Supabase pausado por inactividad | Camino de error técnico y avisar al equipo: se resuelve reactivando el proyecto (runbook del README), no reintentando |
 | Sin respuesta / timeout | El servicio puede estar despertando (plan Free de Render, ~1 minuto) | Reintentar; antes de una demo, despertar con `GET /health` |
 
-`POST /recursos/compromisos` es idempotente por `emergencia_externa_id`: repetir exactamente el
-mismo cuerpo devuelve el compromiso existente sin descontar stock otra vez; enviar datos
-diferentes para una emergencia ya comprometida devuelve `409`. La cabecera estándar
-`Idempotency-Key`, que permitirá distinguir intentos de una misma emergencia, queda pendiente.
+Qué pasa si Bonita repite una llamada (por ejemplo, tras un timeout):
+
+| Endpoint | Repetición |
+|---|---|
+| `POST /ofertas/evaluacion` | Idempotente mientras el stock que queda alcance para lo pedido; si no, ver la limitación de [evaluación](evaluacion-ofertas.md#reevaluar-la-misma-emergencia) |
+| `POST /recursos/compromisos` | Idempotente por `emergencia_externa_id`: el mismo cuerpo responde 200 con `repetido: true` sin descontar otra vez; datos distintos para una emergencia ya comprometida, 409 |
+| Liberación de la emergencia, liberación por ONG y finalización | Idempotentes: la repetición responde 200 con `repetido: true` y no reintegra stock dos veces |
+
+La cabecera estándar `Idempotency-Key` no está implementada.
+
+Cómo trata cada conector del proceso los errores de la API (configuración del `.proc`):
+
+| Conector | Falla ante 4xx | Falla ante 5xx | Consecuencia |
+|---|---|---|---|
+| *Enviar ofertas* (`POST /ofertas/evaluacion`) | Sí | Sí | La tarea queda en *Failed* y se reintenta desde el Portal |
+| *Liberar compromisos de emergencia* (`.../liberacion`) | Sí | Sí | Por eso la liberación sin compromisos responde 200 y no 404 |
+| *Liberar compromisos de ONG no seleccionadas* (script Groovy) | Solo si no es 404 | Sí | Un 404 cuenta como "la ONG no tenía compromisos" |
+| *Finalizar emergencia en Sistema Nacional* (`.../finalizacion`) | No | No | El proceso termina igual; un 5xx deja los recursos sin devolver hasta que se repita la llamada |
 
 ## 4. Endpoint de salud
 

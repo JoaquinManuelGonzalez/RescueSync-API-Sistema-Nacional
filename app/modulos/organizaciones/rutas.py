@@ -113,7 +113,11 @@ class OrganizacionesHabilitadas(MethodView):
         200,
         OrganizacionesPaginadasSchema,
         example=EJEMPLO_ONGS_HABILITADAS,
-        description="Muestra todas las ONGs (con filtro por `nivel_certificacion == alta`).",
+        description=(
+            "ONGs habilitadas con sus certificaciones. `certificacion_id` deja las que tienen esa "
+            "certificación y `nivel_certificacion`, las que tienen alguna certificación con ese "
+            "nivel."
+        ),
     )
     @blueprint_organizaciones.alt_response(
         400,

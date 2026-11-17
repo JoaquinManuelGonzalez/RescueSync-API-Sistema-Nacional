@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "RescueSync - API del Sistema Nacional",
-    "description": "Pruebas de la autenticación JWT, las consultas de catálogo y el padrón de ONGs. Elegir el entorno (local o render), completar contrasenaAdmin y clientSecretBonita, y correr la colección en orden (Run collection). Ver docs/contratos/autenticacion.md.",
+    "description": "Pruebas de la API del Sistema Nacional: autenticación JWT y protección por rol, consultas de catálogo y disponibilidad, padrón de ONGs, carga de inventario y certificaciones, compromiso, validación, liberación y finalización de recursos (con control de concurrencia) y evaluación de ofertas. Elegir el entorno (local o render), completar contrasenaAdmin y clientSecretBonita, y correr la colección completa en orden (Run collection, sin reordenar): 40 requests y 55 aserciones. Se puede volver a correr sobre la misma base. Manual: docs/postman/Manual_de_Pruebas_Postman.pdf.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
