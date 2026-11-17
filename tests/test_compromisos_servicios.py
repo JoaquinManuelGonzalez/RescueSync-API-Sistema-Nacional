@@ -681,3 +681,41 @@ def test_reintento_despues_de_suspension_sigue_siendo_exitoso(base_de_datos):
         aportes=aportes_validos(),
     )
     assert resultado2.repetido is True
+
+
+def test_comprometer_recursos_acepta_cuit_sin_guiones(base_de_datos):
+    resultado = comprometer_recursos(
+        emergencia_externa_id="13",
+        nivel_gravedad="MEDIA",
+        aportes=[
+            AporteSolicitado(
+                identificador_nacional="30111111111",
+                codigo_recurso="RSR-ENFERMEROS",
+                cantidad=4,
+                tipo_asignacion=TipoAsignacion.principal,
+            )
+        ],
+    )
+
+    assert [c.organizacion.identificador_nacional for c in resultado.compromisos] == [
+        "30-11111111-1"
+    ]
+    assert [fila.cantidad_disponible for fila in db.session.query(InventarioItem)] == [6, 8]
+
+
+def test_liberar_recursos_ong_acepta_cuit_sin_guiones(base_de_datos):
+    comprometer_recursos(
+        emergencia_externa_id="13",
+        nivel_gravedad="MEDIA",
+        aportes=aportes_validos(),
+    )
+
+    resultado = liberar_recursos_ong(
+        emergencia_externa_id="13",
+        identificador_nacional="30111111111",
+    )
+
+    assert resultado.repetido is False
+    assert resultado.compromisos[0].organizacion.identificador_nacional == "30-11111111-1"
+    assert resultado.compromisos[0].estado is EstadoCompromiso.liberado
+    assert [fila.cantidad_disponible for fila in db.session.query(InventarioItem)] == [10, 5]

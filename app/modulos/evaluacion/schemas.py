@@ -7,9 +7,11 @@ from app.modulos.organizaciones.modelos import NivelCertificacion
 
 class AporteOfertaSchema(Schema):
     cantidad = fields.Integer(required=True, strict=True, validate=validate.Range(min=1))
+    # La web lo tiene opcional: si llega vacío o en `null`, se rechaza solo ese aporte.
     identificador_nacional = fields.String(
         required=True,
-        validate=validate.Length(min=1, max=255),
+        allow_none=True,
+        validate=validate.Length(max=255),
     )
     # Es informativo: nunca se usa para cruzar con la base del Sistema Nacional.
     organizacion_id = fields.Integer(required=True, validate=validate.Range(min=1))
@@ -41,7 +43,8 @@ class OrganizacionOfertaSchema(Schema):
     id = fields.Integer(required=True, validate=validate.Range(min=1))
     identificador_nacional = fields.String(
         required=True,
-        validate=validate.Length(min=1, max=255),
+        allow_none=True,
+        validate=validate.Length(max=255),
     )
     nombre = fields.String(required=True)
     rol = fields.String(required=True)
@@ -75,7 +78,7 @@ class EvaluacionOfertasSchema(Schema):
 
 class EvaluacionAporteSchema(Schema):
     cantidad = fields.Integer(required=True)
-    identificador_nacional = fields.String(required=True)
+    identificador_nacional = fields.String(required=True, allow_none=True)
     organizacion_id = fields.Integer(required=True)
     certificacion_encontrada = fields.Boolean(required=True)
     nivel_riesgo_permitido = fields.Enum(

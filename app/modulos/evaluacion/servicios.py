@@ -15,10 +15,14 @@ from app.modulos.organizaciones.modelos import (
     Organizacion,
     TipoOrganizacion,
 )
+from app.modulos.organizaciones.servicios import normalizar_identificador
 
 CLASIFICACION_PRINCIPAL = "principal"
 CLASIFICACION_APOYO = "apoyo"
 CLASIFICACION_RECHAZADA = "rechazada"
+
+MOTIVO_SIN_IDENTIFICADOR = "La organización no informó su identificador nacional (CUIT)."
+MOTIVO_NO_REGISTRADA = "La organización no está registrada en el padrón nacional."
 
 _ORDEN_NIVELES = {
     NivelCertificacion.baja: 1,
@@ -75,28 +79,37 @@ def _nivel_por_tipo(organizacion: Organizacion, tipo) -> NivelCertificacion | No
     return max(niveles, key=_ORDEN_NIVELES.get) if niveles else None
 
 
+def _aporte_rechazado(aporte: dict, identificador: str | None, motivo: str) -> dict:
+    return {
+        **aporte,
+        "identificador_nacional": identificador,
+        "certificacion_encontrada": False,
+        "nivel_riesgo_permitido": None,
+        "clasificacion": CLASIFICACION_RECHAZADA,
+        "motivo": motivo,
+        "compromiso_registrado": False,
+    }
+
+
 def _evaluar_aporte(
     aporte: dict,
     recurso: Item,
     requerido: NivelCertificacion,
 ) -> tuple[dict, AporteSolicitado | None]:
-    identificador = aporte["identificador_nacional"].strip()
+    # La respuesta repite el identificador tal como llegó (recortado), porque la web cruza el
+    # resultado por ese dato; para buscar en el padrón se usa la forma normalizada.
+    recibido = aporte["identificador_nacional"]
+    identificador = recibido.strip() if recibido is not None else None
+    if not identificador:
+        return _aporte_rechazado(aporte, identificador, MOTIVO_SIN_IDENTIFICADOR), None
+
     organizacion = db.session.scalar(
-        select(Organizacion).where(Organizacion.identificador_nacional == identificador)
+        select(Organizacion).where(
+            Organizacion.identificador_nacional == normalizar_identificador(identificador)
+        )
     )
     if organizacion is None:
-        return (
-            {
-                **aporte,
-                "identificador_nacional": identificador,
-                "certificacion_encontrada": False,
-                "nivel_riesgo_permitido": None,
-                "clasificacion": CLASIFICACION_RECHAZADA,
-                "motivo": "La organización no está registrada en el padrón nacional.",
-                "compromiso_registrado": False,
-            },
-            None,
-        )
+        return _aporte_rechazado(aporte, identificador, MOTIVO_NO_REGISTRADA), None
 
     habilitada = (
         organizacion.estado_habilitacion is EstadoHabilitacion.habilitada
@@ -147,7 +160,7 @@ def _evaluar_aporte(
     }
     aporte_comprometido = (
         AporteSolicitado(
-            identificador_nacional=identificador,
+            identificador_nacional=organizacion.identificador_nacional,
             codigo_recurso=recurso.codigo_recurso,
             cantidad=aporte["cantidad"],
             tipo_asignacion=TipoAsignacion(clasificacion),

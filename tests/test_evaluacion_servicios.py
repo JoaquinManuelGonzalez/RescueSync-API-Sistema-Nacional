@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 from app.extensiones import db
 from app.modulos.compromisos.modelos import Compromiso, TipoAsignacion
-from app.modulos.evaluacion.servicios import evaluar_ofertas
+from app.modulos.evaluacion.servicios import MOTIVO_SIN_IDENTIFICADOR, evaluar_ofertas
 from app.modulos.organizaciones.modelos import (
     Certificacion,
     EstadoHabilitacion,
@@ -180,3 +180,104 @@ def test_evaluacion_rechaza_sin_certificacion_y_por_stock_insuficiente(base_de_d
     item = resultado["ofertas"][0]["items"][0]["aportes"][0]
     assert item["clasificacion"] == "rechazada"
     assert "disponibilidad" in item["motivo"]
+
+
+def _ong_con_ambulancias(*, cuit: str = "30-33333333-3", stock: int = 5) -> Organizacion:
+    ambulancia = Item(
+        codigo_recurso="RSR-AMBULANCIAS",
+        nombre="Ambulancias",
+        tipo=TipoItem.rescate,
+        unidad_medida="unidades",
+        consumible=False,
+    )
+    certificacion = Certificacion(nombre="Rescate", tipo=TipoItem.rescate)
+    organizacion = _organizacion(cuit=cuit, nombre="ONG Ambulancias")
+    organizacion.inventario = Inventario(
+        items=[InventarioItem(item=ambulancia, cantidad_disponible=stock)]
+    )
+    organizacion.certificaciones = [
+        OrganizacionCertificacion(
+            certificacion=certificacion,
+            nivel_riesgo_permitido=NivelCertificacion.alta,
+            fecha_emision=datetime.now(UTC),
+        )
+    ]
+    db.session.add_all([ambulancia, certificacion, organizacion])
+    db.session.commit()
+    return organizacion
+
+
+def _aporte(identificador: str | None, cantidad: int) -> dict:
+    return {"cantidad": cantidad, "identificador_nacional": identificador, "organizacion_id": 900}
+
+
+def _item_ofertado(aportes: list[dict], *, lote_item_id: int = 10) -> dict:
+    return {
+        "aportes": aportes,
+        "cantidad_total": sum(aporte["cantidad"] for aporte in aportes),
+        "codigo_recurso": "RSR-AMBULANCIAS",
+        "lote_item_id": lote_item_id,
+        "tipo_recurso": "rescate",
+        "unidad": "unidades",
+    }
+
+
+def _oferta(items: list[dict], *, oferta_id: int = 1) -> dict:
+    return {
+        "fecha_creacion": datetime.now(UTC),
+        "oferta_id": oferta_id,
+        "organizaciones": [],
+        "version": 1,
+        "items": items,
+    }
+
+
+def test_evaluacion_rechaza_solo_el_aporte_sin_cuit(base_de_datos):
+    organizacion = _ong_con_ambulancias()
+
+    resultado = evaluar_ofertas(
+        emergencia_id=20,
+        nivel_gravedad="ALTA",
+        ofertas=[
+            _oferta(
+                [
+                    _item_ofertado(
+                        [
+                            _aporte(None, 1),
+                            _aporte("   ", 1),
+                            _aporte(organizacion.identificador_nacional, 2),
+                        ]
+                    )
+                ]
+            )
+        ],
+    )
+
+    sin_cuit, en_blanco, valido = resultado["ofertas"][0]["items"][0]["aportes"]
+    assert sin_cuit["identificador_nacional"] is None
+    assert sin_cuit["clasificacion"] == "rechazada"
+    assert sin_cuit["motivo"] == MOTIVO_SIN_IDENTIFICADOR
+    assert sin_cuit["compromiso_registrado"] is False
+    assert en_blanco["clasificacion"] == "rechazada"
+    assert en_blanco["motivo"] == MOTIVO_SIN_IDENTIFICADOR
+    assert valido["clasificacion"] == "principal"
+    assert valido["compromiso_registrado"] is True
+    compromiso = db.session.query(Compromiso).one()
+    assert [item.cantidad_comprometida for item in compromiso.items] == [2]
+
+
+def test_evaluacion_encuentra_la_ong_con_cuit_sin_guiones(base_de_datos):
+    _ong_con_ambulancias(cuit="30-33333333-3")
+
+    resultado = evaluar_ofertas(
+        emergencia_id=21,
+        nivel_gravedad="ALTA",
+        ofertas=[_oferta([_item_ofertado([_aporte(" 30333333333 ", 2)])])],
+    )
+
+    aporte = resultado["ofertas"][0]["items"][0]["aportes"][0]
+    assert aporte["clasificacion"] == "principal"
+    # La respuesta repite el identificador como llegó: la web cruza el resultado por ese dato.
+    assert aporte["identificador_nacional"] == "30333333333"
+    compromiso = db.session.query(Compromiso).one()
+    assert compromiso.organizacion.identificador_nacional == "30-33333333-3"

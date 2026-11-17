@@ -46,6 +46,13 @@ Cada ítem consolidado puede tener aportes de varias organizaciones. Para cruzar
 nacional se usa exclusivamente `identificador_nacional`; `organizacion_id` pertenece al sistema
 origen y es únicamente informativo.
 
+El CUIT se busca con o sin guiones: `30654321987` encuentra a `30-65432198-7`. Si un aporte llega
+con `identificador_nacional` vacío o en `null` (en la web el dato es opcional), la evaluación no
+responde 400: ese aporte sale `rechazada` con el motivo "La organización no informó su
+identificador nacional (CUIT)." y el resto se evalúa normalmente. La respuesta repite el
+identificador tal como llegó, porque la web cruza el resultado por ese dato. En `organizaciones`
+también se acepta `null`.
+
 `version` se recibe como metadato de la oferta de origen, pero no forma parte del resultado de
 evaluación. La API tampoco devuelve una clasificación general de la oferta ni del ítem, ni un indicador
 global de compromisos. La decisión y el motivo se informan únicamente dentro de cada aporte.
@@ -54,7 +61,7 @@ Para cada aporte de cada ítem se busca una certificación cuyo tipo coincida co
 
 | Resultado | Regla |
 |---|---|
-| `rechazada` | No existe certificación, la organización no está registrada o no está habilitada, o el stock no consumible es insuficiente |
+| `rechazada` | No existe certificación, la organización no informó su CUIT, no está registrada o no está habilitada, o el stock no consumible es insuficiente |
 | `apoyo` | Existe certificación, pero su nivel es menor que la gravedad |
 | `principal` | La certificación alcanza el nivel de gravedad |
 

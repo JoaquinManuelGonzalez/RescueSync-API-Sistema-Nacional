@@ -30,7 +30,8 @@ contratos de [autenticación](autenticacion.md) y [logging](logging.md).
 - `nivel_gravedad`: `BAJA`, `MEDIA`, `ALTA` o `CRITICA`. También se aceptan las variantes
   internas `BAJO`, `MEDIO`, `ALTO` y `CRITICO`.
 - `aportes`: uno o más recursos ya seleccionados. Cada uno identifica la ONG por su identificador
-  nacional y el recurso por `codigo_recurso`; la cantidad debe ser un entero positivo.
+  nacional (el CUIT, con o sin guiones) y el recurso por `codigo_recurso`; la cantidad debe ser un
+  entero positivo.
 - `tipo_asignacion`: `principal` o `apoyo`.
 - No se permite repetir la combinación de organización y recurso dentro de la solicitud.
 
@@ -103,7 +104,8 @@ selectivas, libera los compromisos activos restantes sin volver a reintegrar los
 Requiere rol `sistema`. No necesita cuerpo. Libera todos los recursos comprometidos por una ONG
 para una emergencia. Se usa cuando se descarta la oferta de esa ONG; en un consorcio el proceso
 invoca este endpoint una vez por cada organización participante. Los recursos no consumibles
-vuelven al inventario y los consumibles permanecen descontados.
+vuelven al inventario y los consumibles permanecen descontados. `{identificador_nacional}` es el
+CUIT de la ONG, con o sin guiones (`30-65432198-7` o `30654321987`).
 
 Responde `200 OK` con el compromiso liberado. Las repeticiones son idempotentes (`repetido: true`)
 y no reintegran recursos de nuevo.

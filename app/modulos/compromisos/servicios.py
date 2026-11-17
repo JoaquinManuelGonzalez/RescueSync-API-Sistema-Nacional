@@ -25,6 +25,7 @@ from app.modulos.organizaciones.modelos import (
     Item,
     Organizacion,
 )
+from app.modulos.organizaciones.servicios import normalizar_identificador
 
 
 class DisponibilidadInsuficiente(ReglaDeNegocioIncumplida):
@@ -135,7 +136,7 @@ def _normalizar_aportes(
     normalizados: list[AporteSolicitado] = []
     claves: set[tuple[str, str]] = set()
     for aporte in aportes:
-        identificador = aporte.identificador_nacional.strip()
+        identificador = normalizar_identificador(aporte.identificador_nacional)
         codigo = aporte.codigo_recurso.strip()
         if not identificador or not codigo:
             raise ReglaDeNegocioIncumplida(
@@ -633,6 +634,7 @@ def liberar_recursos_ong(
         raise ReglaDeNegocioIncumplida("La organización debe identificarse.")
     if len(identificador) > 255:
         raise ReglaDeNegocioIncumplida("El identificador nacional es demasiado largo.")
+    identificador = normalizar_identificador(identificador)
 
     with _transaccion_atomica():
         compromiso = db.session.scalar(

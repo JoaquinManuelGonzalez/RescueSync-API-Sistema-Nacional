@@ -42,19 +42,38 @@ TRANSICIONES: dict[EstadoHabilitacion, frozenset[EstadoHabilitacion]] = {
 MOTIVO_ALTA = "Alta en el padrón nacional."
 
 
+def _cuit_con_formato(valor: str | None) -> str | None:
+    """El CUIT en formato NN-NNNNNNNN-N, o `None` si no son 11 dígitos con o sin guiones."""
+    digitos = re.sub(r"[\s-]", "", valor or "")
+    if not re.fullmatch(r"\d{11}", digitos):
+        return None
+    return f"{digitos[:2]}-{digitos[2:10]}-{digitos[10]}"
+
+
 def normalizar_cuit(valor: str) -> str:
     """Acepta 11 dígitos con o sin guiones y devuelve el formato NN-NNNNNNNN-N.
 
     No se valida el dígito verificador: los CUIT de demostración son ficticios y los comparte la
     aplicación web, que los usa como clave para cruzar sus organizaciones con el padrón.
     """
-    digitos = re.sub(r"[\s-]", "", valor or "")
-    if not re.fullmatch(r"\d{11}", digitos):
+    cuit = _cuit_con_formato(valor)
+    if cuit is None:
         raise SolicitudInvalida(
             "El CUIT tiene que tener 11 dígitos, con o sin guiones (por ejemplo 30-12345678-9).",
             detalle={"cuit": valor},
         )
-    return f"{digitos[:2]}-{digitos[2:10]}-{digitos[10]}"
+    return cuit
+
+
+def normalizar_identificador(valor: str) -> str:
+    """La clave con la que se busca en el padrón un CUIT que manda otro sistema.
+
+    A diferencia de `normalizar_cuit`, no rechaza lo que no tenga formato de CUIT: lo devuelve
+    recortado, para que la búsqueda no encuentre la organización y quien llama decida qué hacer
+    (la evaluación rechaza ese aporte; los compromisos responden 404). Así, un identificador mal
+    cargado en la web afecta solo a esa organización y no a toda la solicitud.
+    """
+    return _cuit_con_formato(valor) or valor.strip()
 
 
 def obtener_por_cuit(cuit: str) -> Organizacion:
