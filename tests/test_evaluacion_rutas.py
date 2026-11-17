@@ -67,3 +67,29 @@ def test_evaluacion_con_cuit_nulo_rechaza_el_aporte_y_responde_200(cliente, cabe
     assert aporte["clasificacion"] == "rechazada"
     assert aporte["compromiso_registrado"] is False
     assert db.session.query(Compromiso).count() == 0
+
+
+def test_evaluacion_sin_ofertas_responde_200_sin_comprometer(cliente, cabeceras, base_de_datos):
+    respuesta = cliente.post(
+        "/ofertas/evaluacion",
+        json={"emergencia_id": 31, "nivel_gravedad": "MEDIA", "ofertas": []},
+        headers=cabeceras(Rol.sistema),
+    )
+
+    assert respuesta.status_code == 200
+    assert respuesta.get_json() == {
+        "emergencia_id": 31,
+        "nivel_gravedad": "MEDIA",
+        "ofertas": [],
+    }
+    assert db.session.query(Compromiso).count() == 0
+
+
+def test_evaluacion_sin_el_campo_ofertas_sigue_respondiendo_400(cliente, cabeceras, base_de_datos):
+    respuesta = cliente.post(
+        "/ofertas/evaluacion",
+        json={"emergencia_id": 31, "nivel_gravedad": "MEDIA"},
+        headers=cabeceras(Rol.sistema),
+    )
+
+    assert respuesta.status_code == 400

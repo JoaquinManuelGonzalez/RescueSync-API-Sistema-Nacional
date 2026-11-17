@@ -69,11 +69,9 @@ class OfertaConsolidadaSchema(Schema):
 class EvaluacionOfertasSchema(Schema):
     emergencia_id = fields.Integer(required=True, validate=validate.Range(min=1))
     nivel_gravedad = fields.String(required=True)
-    ofertas = fields.List(
-        fields.Nested(OfertaConsolidadaSchema),
-        required=True,
-        validate=validate.Length(min=1),
-    )
+    # Puede venir vacía: una convocatoria que cerró sin ofertas presentadas se evalúa igual (no
+    # compromete nada) para que el proceso siga y decida si reinicia.
+    ofertas = fields.List(fields.Nested(OfertaConsolidadaSchema), required=True)
 
 
 class EvaluacionAporteSchema(Schema):

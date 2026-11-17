@@ -42,6 +42,10 @@ individual o un consorcio; en el segundo caso cada miembro se evalúa de manera 
 }
 ```
 
+`ofertas` puede ser una lista vacía: pasa cuando la convocatoria cerró sin ofertas presentadas.
+En ese caso la API responde `200 OK` con `"ofertas": []` y no compromete nada, para que el proceso
+siga y pueda reiniciar la convocatoria. Omitir el campo sigue siendo un 400.
+
 Cada ítem consolidado puede tener aportes de varias organizaciones. Para cruzar con el padrón
 nacional se usa exclusivamente `identificador_nacional`; `organizacion_id` pertenece al sistema
 origen y es únicamente informativo.
