@@ -6,7 +6,7 @@ el PDF. ReportLab no es dependencia de la API, así que se trae solo para correr
 
     uv run --no-project --with reportlab==5.1.0 python docs/postman/generar_manual.py
 
-Nunca se escriben credenciales en el manual: cada entorno tiene las suyas.
+La tabla de credenciales (sección 3.3) tiene las de la nube, para la evaluación.
 """
 
 from __future__ import annotations
@@ -233,8 +233,8 @@ def introduccion() -> list:
         ),
         parrafo("3.3 Credenciales del entorno", "h2"),
         parrafo(
-            "Antes de la primera corrida se completan dos variables del entorno. Los valores no "
-            "están en la colección, en los entornos versionados ni en este manual."
+            "Antes de la primera corrida se completan dos variables del entorno. Con el entorno "
+            "render se usan los valores de esta tabla."
         ),
         tabla(
             ["Variable", "Valor", "De dónde sale"],
@@ -242,16 +242,16 @@ def introduccion() -> list:
                 ["usuarioAdmin", "admin-sn", "Fijo, viene completo"],
                 [
                     "contrasenaAdmin",
-                    "(completar)",
-                    "Local: SEMILLA_CONTRASENA_ADMIN del .env. Render: la que figura en el "
-                    "documento de la entrega",
+                    "RescueSync.2026",
+                    "Credencial del administrador en producción (Render). En local: "
+                    "SEMILLA_CONTRASENA_ADMIN del .env",
                 ],
                 ["clientIdBonita", "bonita-rescuesync", "Fijo, viene completo"],
                 [
                     "clientSecretBonita",
-                    "(completar)",
-                    "Local: SEMILLA_SECRETO_BONITA del .env. Render: la que figura en el documento "
-                    "de la entrega",
+                    "RescueSync.2026",
+                    "Clave secreta de Bonita en producción (Render). En local: "
+                    "SEMILLA_SECRETO_BONITA del .env",
                 ],
             ],
             [3.6, 3.2, 10.2],

@@ -293,5 +293,5 @@ class Compromisos(MethodView):
   (client id y secret; Swagger pide el token solo). El token sobrevive a recargar la página.
 - **Postman**: `docs/postman/` tiene la colección, los entornos `local` y `render` y el manual
   de pruebas en PDF. Completar las credenciales en el entorno y correr la colección en orden: los
-  logins guardan los tokens en variables que usan los demás pedidos. Las credenciales nunca se
-  escriben en la colección, en los entornos versionados ni en el manual.
+  logins guardan los tokens en variables que usan los demás pedidos. Las credenciales de la nube
+  para la evaluación están en la sección 3.3 del manual.

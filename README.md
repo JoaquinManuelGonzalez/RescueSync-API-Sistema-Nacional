@@ -278,8 +278,9 @@ Todo endpoint, salvo `/login`, `/health`, `/docs` y `/openapi.json`, exige un JW
 | `admin-sn` | `administrador` | Dar de alta ONGs y cambiar su habilitación (Swagger, Postman) |
 | `bonita-rescuesync` | `sistema` | Los conectores REST del proceso de Bonita |
 
-Las credenciales de la nube no están en el repositorio: van en el documento de la entrega. En
-Render, las cuentas se crean solas en el deploy a partir de `SEMILLA_CONTRASENA_ADMIN` y
+Las credenciales de la nube para la evaluación están en el
+[manual de pruebas](docs/postman/Manual_de_Pruebas_Postman.pdf) (sección 3.3). En Render, las
+cuentas se crean solas en el deploy a partir de `SEMILLA_CONTRASENA_ADMIN` y
 `SEMILLA_SECRETO_BONITA` ([runbook](#runbook-crear-cuentas-en-supabase)).
 
 **Swagger** (`/docs`):
