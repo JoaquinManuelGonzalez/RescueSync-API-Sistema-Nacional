@@ -27,14 +27,15 @@ Aplicación web ──► Bonita (proceso BPMN) ──► API del Sistema Nacion
 3. [Mapa del repositorio](#mapa-del-repositorio)
 4. [Variables de entorno](#variables-de-entorno)
 5. [Comandos frecuentes](#comandos-frecuentes)
-6. [Autenticación y prueba con Swagger y Postman](#autenticación-y-prueba-con-swagger-y-postman)
-7. [Despliegue en Render](#despliegue-en-render)
-8. [Base de datos: local y nube](#base-de-datos-local-y-nube)
-9. [Límites de los planes Free y runbooks](#límites-de-los-planes-free-y-runbooks)
-10. [Integración con Bonita](#integración-con-bonita)
-11. [Problemas conocidos](#problemas-conocidos)
-12. [Documentación](#documentación)
-13. [Registro de validación](#registro-de-validación)
+6. [Endpoints](#endpoints)
+7. [Autenticación y prueba con Swagger y Postman](#autenticación-y-prueba-con-swagger-y-postman)
+8. [Despliegue en Render](#despliegue-en-render)
+9. [Base de datos: local y nube](#base-de-datos-local-y-nube)
+10. [Límites de los planes Free y runbooks](#límites-de-los-planes-free-y-runbooks)
+11. [Integración con Bonita](#integración-con-bonita)
+12. [Problemas conocidos](#problemas-conocidos)
+13. [Documentación](#documentación)
+14. [Registro de validación](#registro-de-validación)
 
 ## Puesta en marcha
 
@@ -153,28 +154,38 @@ app/                    código de la API
   wsgi.py               objeto que levantan flask y gunicorn (app.wsgi:app)
   extensiones.py        db, migrate y jwt
   core/                 configuracion, errores, logging, salud (/health),
-                        acceso (JWT, roles, Blueprint protegido), openapi (Swagger)
+                        acceso (JWT, roles, Blueprint protegido), openapi (Swagger),
+                        identificadores (UUIDv7 y UUIDv5 del catálogo), semillas
   modulos/              módulos de dominio:
     autenticacion/      /login, /cuentas/yo, tabla cuentas y comandos `flask cuentas`
-    organizaciones/     padrón de ONGs (/ongs), estados de habilitación e inventarios
+    organizaciones/     padrón de ONGs (/ongs), habilitación, catálogos, disponibilidad,
+                        inventarios y certificaciones
     evaluacion/         evaluación de ofertas por competencia (/ofertas/evaluacion)
-    compromisos/        bloqueo y liberación de recursos
-migrations/             migraciones de Alembic (0001: línea base;
-                        f5b04d297d15: organizaciones e inventarios;
-                        c7a8f1d2e3b4: certificaciones;
-                        d026ce7dc122: compromisos de recursos;
-                        462daf0d4c41: consumible y ajuste de cantidades;
-                        a63f9d20bc41: alineación con el diagrama;
-                        b8e41c7d2f90: cuentas y estado de habilitación;
-                        c0ebb05602a1: merge de ramas;
-                        4a7c2d9e1f63: cierre global de emergencia y liberación de recursos)
+    compromisos/        compromiso, validación, liberación y finalización de recursos
+migrations/             migraciones de Alembic, en orden:
+                        0001          línea base
+                        f5b04d297d15  organizaciones e inventarios
+                        c7a8f1d2e3b4  certificaciones
+                        d026ce7dc122  compromisos de recursos
+                        462daf0d4c41  consumible y tipo de asignación
+                        a63f9d20bc41  alineación con el diagrama
+                        9d8e7f6a5b4c  código compartido de los recursos
+                        b8e41c7d2f90  cuentas y estado de habilitación (EPIC-61)
+                        c0ebb05602a1  une las ramas 9d8e7f6a5b4c y b8e41c7d2f90
+                        4a7c2d9e1f63  finalización por ONG y cierre de proyecto
+                        e7f8a9b0c1d2  restringe los niveles de certificación
+                        f1a2b3c4d5e6  une las ramas 4a7c2d9e1f63 y e7f8a9b0c1d2
+                        5b9d3e7a1c42  claves UUID en todas las tablas, conservando los datos
+                        8c3f1e5a7b20  cierra los compromisos de emergencias sin UUID
 tests/                  tests con pytest (SQLite en memoria)
 docs/adr/               decisiones de arquitectura
-docs/contratos/         contratos de autenticación, configuración, errores y logging
-docs/postman/           colección y entornos de Postman
-.github/workflows/ci.yml  CI: calidad (ruff, pytest, render.yaml) + imagen (smoke tests)
+docs/contratos/         contratos: autenticación, organizaciones, evaluación de ofertas,
+                        compromisos, configuración, errores y logging
+docs/postman/           colección, entornos, manual de pruebas (PDF) y su generador
+.github/workflows/ci.yml  CI: calidad (ruff, pytest, render.yaml) + imagen (smoke tests,
+                        flask db check, imagen de producción)
 Dockerfile              imagen multi-stage: desarrollo / produccion (por defecto)
-entrypoint.sh           aplica migraciones y arranca el servidor
+entrypoint.sh           aplica migraciones, carga los datos semilla y arranca el servidor
 healthcheck.py          healthcheck del contenedor para docker compose
 docker-compose.yml      entorno local: db + api (+ adminer con --profile herramientas)
 render.yaml             Blueprint de Render: web service de la nube como código
@@ -229,6 +240,33 @@ Con uv instalado, la verificación previa a cada commit es:
 uv run ruff format --check . && uv run ruff check . && uv run pytest
 ```
 
+## Endpoints
+
+Todos los ids son UUID ([ADR-006](docs/adr/ADR-006-claves-uuid.md)). El detalle de cada endpoint,
+con cuerpos, respuestas y errores, está en el contrato de la última columna y en Swagger (`/docs`).
+
+| Método | Ruta | Rol | Qué hace | Contrato |
+|---|---|---|---|---|
+| `POST` | `/login` | público | Emite un JWT (JSON o OAuth2 client credentials) | [autenticación](docs/contratos/autenticacion.md) |
+| `GET` | `/cuentas/yo` | `sistema`, `administrador` | Cuenta, rol y trazabilidad del token | [autenticación](docs/contratos/autenticacion.md) |
+| `POST` | `/ongs` | `administrador` | Alta de una organización en el padrón (nace `pendiente`) | [organizaciones](docs/contratos/organizaciones.md) |
+| `GET` | `/ongs/{cuit}` | `sistema`, `administrador` | Organización y estado de habilitación | [organizaciones](docs/contratos/organizaciones.md) |
+| `PATCH` | `/ongs/{cuit}/habilitacion` | `administrador` | Habilitar o suspender | [organizaciones](docs/contratos/organizaciones.md) |
+| `GET` | `/ongs/{cuit}/habilitacion/historial` | `sistema`, `administrador` | Cambios de estado | [organizaciones](docs/contratos/organizaciones.md) |
+| `GET` | `/ongs` | `sistema`, `administrador` | ONGs habilitadas, con filtros de certificación | [organizaciones](docs/contratos/organizaciones.md) |
+| `GET` | `/certificaciones` | `sistema`, `administrador` | Catálogo de certificaciones | [organizaciones](docs/contratos/organizaciones.md) |
+| `GET` | `/recursos/disponibilidad` | `sistema`, `administrador` | Disponibilidad global de recursos no consumibles | [organizaciones](docs/contratos/organizaciones.md) |
+| `GET` | `/ongs/{cuit}/recursos/disponibilidad` | `sistema`, `administrador` | Disponibilidad de una organización | [organizaciones](docs/contratos/organizaciones.md) |
+| `POST` | `/ongs/{cuit}/inventario` | `administrador` | Carga un ítem en el inventario | [organizaciones](docs/contratos/organizaciones.md) |
+| `POST` | `/ongs/{cuit}/certificaciones` | `administrador` | Asigna una certificación con su nivel | [organizaciones](docs/contratos/organizaciones.md) |
+| `POST` | `/ofertas/evaluacion` | `sistema` | Clasifica los aportes y **compromete** los no consumibles aceptados | [evaluación](docs/contratos/evaluacion-ofertas.md) |
+| `POST` | `/recursos/compromisos` | `sistema` | Compromete aportes (todo o nada) | [compromisos](docs/contratos/compromisos.md) |
+| `POST` | `/recursos/compromisos/validar` | `sistema` | Valida aportes sin modificar nada | [compromisos](docs/contratos/compromisos.md) |
+| `POST` | `/recursos/compromisos/{id}/liberacion` | `sistema` | Libera todo lo comprometido de la emergencia (reinicio) | [compromisos](docs/contratos/compromisos.md) |
+| `POST` | `/recursos/compromisos/{id}/ongs/{cuit}/liberacion` | `sistema` | Libera lo comprometido de una ONG | [compromisos](docs/contratos/compromisos.md) |
+| `POST` | `/recursos/compromisos/{id}/finalizacion` | `sistema` | Cierra la emergencia y libera lo que quede | [compromisos](docs/contratos/compromisos.md) |
+| `GET` | `/health` | público | Salud de la API y de la base | [errores](docs/contratos/errores.md) |
+
 ## Autenticación y prueba con Swagger y Postman
 
 Todo endpoint, salvo `/login`, `/health`, `/docs` y `/openapi.json`, exige un JWT. El detalle
@@ -240,8 +278,9 @@ Todo endpoint, salvo `/login`, `/health`, `/docs` y `/openapi.json`, exige un JW
 | `admin-sn` | `administrador` | Dar de alta ONGs y cambiar su habilitación (Swagger, Postman) |
 | `bonita-rescuesync` | `sistema` | Los conectores REST del proceso de Bonita |
 
-Las credenciales de la nube no están en el repositorio: van en el documento de la entrega. En
-Render, las cuentas se crean solas en el deploy a partir de `SEMILLA_CONTRASENA_ADMIN` y
+Las credenciales de la nube para la evaluación están en el
+[manual de pruebas](docs/postman/Manual_de_Pruebas_Postman.pdf) (sección 3.3). En Render, las
+cuentas se crean solas en el deploy a partir de `SEMILLA_CONTRASENA_ADMIN` y
 `SEMILLA_SECRETO_BONITA` ([runbook](#runbook-crear-cuentas-en-supabase)).
 
 **Swagger** (`/docs`):
@@ -249,18 +288,35 @@ Render, las cuentas se crean solas en el deploy a partir de `SEMILLA_CONTRASENA_
 1. `POST /login` → *Try it out* con `{"usuario": "admin-sn", "contrasena": "..."}`.
 2. Copiar el `access_token` y pegarlo en *Authorize* → `bearerAuth`. O directamente
    *Authorize* → `oauth2` con el usuario como *client_id* y la contraseña como *client_secret*.
-3. Probar los endpoints. El token dura una hora y sobrevive a recargar la página.
+3. Probar los endpoints. El token dura una hora y sobrevive a recargar la página. Los ids son
+   UUID: los del catálogo (ítems y certificaciones) son fijos y aparecen en los ejemplos; los de
+   una emergencia se inventan (cualquier UUID nuevo) o se copian de una respuesta anterior.
 
 **Postman**: importar `docs/postman/sistema-nacional.postman_collection.json` y el entorno
-`local` o `render` de la misma carpeta, completar las credenciales del entorno y correr la
-colección en orden. Los dos logins guardan sus tokens en variables y los demás pedidos muestran
-los casos de la épica: 401 sin token o con token adulterado, 403 por rol, alta de una ONG, 409 por
-CUIT duplicado y la ONG suspendida que se vuelve a habilitar.
+`local` o `render` de la misma carpeta, completar `contrasenaAdmin` y `clientSecretBonita` en el
+entorno y correr la colección completa, en orden. Son 7 carpetas, 40 requests y 55 assertions. El
+paso a paso, el detalle de cada carpeta y qué deja cada corrida en la base están en el
+[manual de pruebas](docs/postman/Manual_de_Pruebas_Postman.pdf).
+
+- Los dos logins guardan sus tokens en variables que usan los demás pedidos.
+- La carpeta de compromisos crea una emergencia nueva (UUID) en cada corrida, la libera por ONG y
+  la finaliza, y la prueba de concurrencia libera lo que comprometió: así se puede volver a correr
+  sin ir agotando el stock.
+- La carpeta de evaluación usa `emergencia_id` fijos (los mismos UUID que Swagger): la primera
+  corrida deja comprometidos 2 paramédicos de Cruz Solidaria en la emergencia `…000000000014` y
+  las siguientes repiten ese compromiso (`repetido`), sin sumar otro.
+- Los pasos que dependen de los datos de demostración no asumen el estado de la base compartida:
+  el padrón vuelve a suspender a Cruz Roja si alguien la habilitó, y el caso de cantidad
+  insuficiente lee los paramédicos disponibles y pide uno más.
+
+Verificación antes de cambiar la colección: correrla **dos veces seguidas** sobre la misma base
+(por ejemplo, con Newman en Docker contra `docker compose`) y que las dos corridas den verde.
 
 Datos de demostración del padrón: las mismas organizaciones, CUIT y tipo que la aplicación web
 (Bomberos Voluntarios de La Plata también es ONG), todas `habilitada` salvo
 **Cruz Roja Argentina - Filial Bahía Blanca** (`30-99999999-4`), que está `suspendida` para
-mostrar el caso de una ONG que oferta en la web y el Sistema Nacional rechaza.
+mostrar el caso de una ONG que oferta en la web y el Sistema Nacional rechaza. La tabla completa
+está en el [contrato de organizaciones](docs/contratos/organizaciones.md#5-datos-de-demostración).
 
 El catálogo de recursos son los **mismos 46 ítems que la aplicación web**, con el mismo
 `codigo_recurso`, tipo, unidad y consumible: Bonita reenvía los códigos de la web sin
@@ -276,7 +332,9 @@ Crean lo que falta sin duplicar y **reponen el stock** de los inventarios de dem
 ítem que quedó por debajo de su cantidad semilla vuelve a esa cantidad, uno que está por encima
 no se toca, y los compromisos no se modifican. También corrigen el tipo, la unidad, la descripción
 y el consumible de los ítems del catálogo y el tipo de las organizaciones, que son datos de
-referencia. El estado de habilitación de las organizaciones que ya existían no se toca.
+referencia. El estado de habilitación de las organizaciones que ya existían no se toca. Por eso
+la base compartida de Supabase puede diferir de la semilla: un stock subido a mano o una ONG que
+alguien habilitó se mantienen entre deploys.
 
 ## Despliegue en Render
 
@@ -386,11 +444,16 @@ a Supabase solas con el deploy.
    renombres de columnas, que interpreta como borrar y crear).
 4. Aplicarla y probar ida y vuelta en local: `docker compose exec api flask db upgrade`, después
    `docker compose exec api flask db downgrade` (sin argumento vuelve una revisión) y de nuevo
-   `upgrade`.
-5. Commit y push. Con el CI en verde, Render despliega y el `entrypoint.sh` corre
+   `upgrade`. Una migración que transforma datos (como la de claves UUID) se prueba además con
+   una copia de los datos reales: un `pg_dump` de Supabase restaurado en un PostgreSQL 17
+   descartable, comparando los datos antes y después.
+5. Verificar que el esquema coincide con los modelos:
+   `docker compose exec api flask db check` tiene que decir `No new upgrade operations detected`.
+   El CI corre el mismo comando y falla si hay diferencias.
+6. Commit y push. Con el CI en verde, Render despliega y el `entrypoint.sh` corre
    `flask db upgrade` contra Supabase antes de arrancar la API. Si la migración falla, el deploy
    no pasa y queda la versión anterior.
-6. Verificar: en los logs del deploy aparece `Running upgrade <anterior> -> <nueva>`, o en el SQL
+7. Verificar: en los logs del deploy aparece `Running upgrade <anterior> -> <nueva>`, o en el SQL
    Editor de Supabase `select version_num from alembic_version;` muestra la revisión nueva.
 
 Reglas:
@@ -573,14 +636,22 @@ proceso:
   Endpoint `urlSistemaNacional + "/login"` y los parámetros `snClientId` / `snClientSecret`. El
   conector pide y renueva el token solo. Pasos completos en la sección 7 de
   [`docs/contratos/autenticacion.md`](docs/contratos/autenticacion.md).
-- Los endpoints de negocio que va a consumir Bonita (evaluación, reserva y compromiso de
-  recursos) llegan en las épicas siguientes. El padrón (`GET /ongs/{cuit}`) ya está disponible.
-- La lógica de dominio para comprometer y liberar recursos está en `app/modulos/compromisos`;
-  [`POST /ofertas/evaluacion`](docs/contratos/evaluacion-ofertas.md) evalúa las ofertas por ítem
-  y registra los compromisos de recursos no consumibles aceptados. Luego,
-  [`POST /recursos/compromisos`](docs/contratos/compromisos.md) permite comprometer los recursos
-  seleccionados por el proceso. El endpoint de finalización registra el cierre de cada ONG y
-  libera el proyecto cuando todas terminan.
+- **Ids**: `emergenciaId`, `convocatoriaId` y `adjudicacionId` son UUID (variables Text del
+  proceso). Ningún script puede convertirlos a número (`Integer.parseInt`, `as Long`).
+
+Las tareas de servicio del proceso (`RescueSync-1.0.proc`) que llaman a la API, en el orden en
+que corren:
+
+| Tarea de servicio | Llamada | Cuándo | Qué hace la API |
+|---|---|---|---|
+| *Enviar ofertas a Sistema Nacional* | [`POST /ofertas/evaluacion`](docs/contratos/evaluacion-ofertas.md) | Después del timer de cierre y de leer las ofertas consolidadas de la web | Clasifica cada aporte y compromete los no consumibles aceptados bajo el `emergencia_id`. La respuesta vuelve a la web para calcular la cobertura |
+| *Solicitar liberación de recursos reservados* | [`POST /recursos/compromisos/{id}/liberacion`](docs/contratos/compromisos.md) | La cobertura no alcanza y el municipio elige reiniciar la convocatoria | Libera todo lo comprometido de la emergencia (200 aunque no haya nada) |
+| *Liberar ofertas no seleccionadas* (script Groovy) | [`POST /recursos/compromisos/{id}/ongs/{cuit}/liberacion`](docs/contratos/compromisos.md), una vez por ONG | El municipio confirmó la selección | Libera lo comprometido de cada ONG evaluada sin ninguna línea seleccionada (`ongsNoSeleccionadas`); 404 = no tenía compromisos |
+| *Informar finalización* | [`POST /recursos/compromisos/{id}/finalizacion`](docs/contratos/compromisos.md) | Terminaron todas las tareas de ejecución | Cierra la emergencia y devuelve el stock no consumible que quedaba |
+
+Qué conector falla ante qué respuesta está en el [contrato de errores](docs/contratos/errores.md),
+sección 3. `POST /recursos/compromisos` y `/validar` no los usa el proceso actual: la evaluación ya
+compromete.
 
 ## Problemas conocidos
 
@@ -606,7 +677,13 @@ proceso:
 7. **`password authentication failed` o `DATABASE_URL no es una URL de base de datos valida` en
    los logs de Render.** La contraseña de `DATABASE_URL` no coincide con la de Supabase o tiene
    caracteres especiales sin codificar: rotarla por una alfanumérica (runbook arriba).
-8. **El deploy falla con `Can't locate revision` en los logs de Render.** Supabase quedó en una
+8. **Una web o un proceso de Bonita viejos reciben 400 `Debe ser un UUID válido.` o 404.** Desde
+   las claves UUID, la API exige UUID en `emergencia_id`, `emergencia_externa_id` y en las rutas de
+   liberación y finalización. La web, la API y el `.proc` se actualizan juntos
+   ([ADR-006](docs/adr/ADR-006-claves-uuid.md)).
+9. **La evaluación de un ejemplo de Swagger responde 409.** Esa emergencia (UUID fijo) ya se
+   finalizó. Usar otro `emergencia_id` (cualquier UUID nuevo).
+10. **El deploy falla con `Can't locate revision` en los logs de Render.** Supabase quedó en una
    revisión de Alembic que el código desplegado no tiene (alguien migró desde su PC con una
    migración sin desplegar). Desplegar el commit que contiene esa migración, o pedir a quien
    administra la base que lo resuelva antes de seguir.
@@ -615,14 +692,16 @@ proceso:
 
 | Documento | Contenido |
 |---|---|
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Convenciones de código, ramas, commits, flujo de épica, pase a `main` y despliegue continuo |
-| [`docs/adr/`](docs/adr/README.md) | ADR-001 framework, ADR-002 plataforma cloud (Render), ADR-003 contenedores y migraciones, ADR-004 base de datos en Supabase, ADR-005 autenticación JWT con cuentas de cliente |
-| [`docs/contratos/autenticacion.md`](docs/contratos/autenticacion.md) | Login, token, roles, permisos, trazabilidad y guía de configuración de Bonita |
-| [`docs/contratos/compromisos.md`](docs/contratos/compromisos.md) | Contrato inicial del endpoint de bloqueo de recursos |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Convenciones de código e identificadores, ramas, commits, Pull Requests y despliegue continuo |
+| [`docs/adr/`](docs/adr/README.md) | ADR-001 framework, ADR-002 plataforma cloud (Render), ADR-003 contenedores y migraciones, ADR-004 base de datos en Supabase, ADR-005 autenticación JWT con cuentas de cliente, ADR-006 claves UUID |
+| [`docs/contratos/autenticacion.md`](docs/contratos/autenticacion.md) | Login, token, roles, matriz de permisos, trazabilidad y guía de configuración de Bonita |
+| [`docs/contratos/organizaciones.md`](docs/contratos/organizaciones.md) | Padrón de ONGs, habilitación, catálogos, disponibilidad, carga de inventario y datos de demostración |
+| [`docs/contratos/evaluacion-ofertas.md`](docs/contratos/evaluacion-ofertas.md) | Evaluación de ofertas por competencia: reglas, respuesta, errores y reevaluación |
+| [`docs/contratos/compromisos.md`](docs/contratos/compromisos.md) | Compromiso, validación, liberación (de la emergencia y por ONG) y finalización |
 | [`docs/contratos/configuracion.md`](docs/contratos/configuracion.md) | Variables de entorno, fail-fast y gestión de secretos |
-| [`docs/contratos/errores.md`](docs/contratos/errores.md) | Envelope de error y qué significa cada código para Bonita |
+| [`docs/contratos/errores.md`](docs/contratos/errores.md) | Envelope de error, qué significa cada código para Bonita e idempotencia |
 | [`docs/contratos/logging.md`](docs/contratos/logging.md) | Formato JSON de logs e id de correlación |
-| [`docs/postman/`](docs/postman) | Colección y entornos de Postman para probar la API |
+| [`docs/postman/`](docs/postman) | Colección, entornos y manual de pruebas de Postman (`generar_manual.py` regenera el PDF) |
 
 ## Registro de validación
 

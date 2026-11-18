@@ -12,8 +12,8 @@ tienen cuenta acá: se autentican en la aplicación web y en Bonita.
 
 | Rol | Cuenta típica | Quién la usa | Qué puede hacer |
 |---|---|---|---|
-| `sistema` | `bonita-rescuesync` | Motor de Bonita (conectores REST) | Consultar el padrón y operar el proceso: evaluación, reserva, compromiso y liberación de recursos |
-| `administrador` | `admin-sn` | Operador del Sistema Nacional (Swagger, Postman) | Dar de alta ONGs en el padrón y cambiar su estado de habilitación |
+| `sistema` | `bonita-rescuesync` | Motor de Bonita (conectores REST y el script de liberación por ONG) | Consultar el padrón y los catálogos, y operar el proceso: evaluación de ofertas, compromiso, validación, liberación y finalización |
+| `administrador` | `admin-sn` | Operador del Sistema Nacional (Swagger, Postman) | Consultar, dar de alta ONGs en el padrón, cambiar su habilitación y cargarles inventario y certificaciones |
 
 La persona que disparó cada paso del proceso no se autentica, pero queda registrada: Bonita la
 informa en una cabecera de trazabilidad ([sección 6](#6-trazabilidad)).
@@ -116,16 +116,25 @@ que el cuerpo: un pedido sin token recibe 401 aunque además tenga el cuerpo mal
 
 ## 5. Matriz de permisos
 
-| Endpoint | `sistema` | `administrador` |
-|---|---|---|
-| `POST /login` | público | público |
-| `GET /cuentas/yo` | ✓ | ✓ |
-| `POST /ongs` (alta en el padrón, nace `pendiente`) | 403 | ✓ |
-| `GET /ongs/{cuit}` | ✓ | ✓ |
-| `PATCH /ongs/{cuit}/habilitacion` | 403 | ✓ |
-| `GET /ongs/{cuit}/habilitacion/historial` | ✓ | ✓ |
-| Consultas de catálogo (certificaciones, ONGs habilitadas, disponibilidad) | ✓ | ✓ |
-| Evaluación, reserva, compromiso y liberación de recursos | ✓ | 403 |
+| Endpoint | `sistema` | `administrador` | Contrato |
+|---|---|---|---|
+| `POST /login` | público | público | sección 2 |
+| `GET /health`, `GET /docs`, `GET /openapi.json` | público | público | [errores](errores.md) §4 |
+| `GET /cuentas/yo` | ✓ | ✓ | sección 5 |
+| `POST /ongs` (alta en el padrón, nace `pendiente`) | 403 | ✓ | [organizaciones](organizaciones.md) |
+| `GET /ongs/{cuit}` | ✓ | ✓ | [organizaciones](organizaciones.md) |
+| `PATCH /ongs/{cuit}/habilitacion` | 403 | ✓ | [organizaciones](organizaciones.md) |
+| `GET /ongs/{cuit}/habilitacion/historial` | ✓ | ✓ | [organizaciones](organizaciones.md) |
+| `GET /ongs` (ONGs habilitadas) | ✓ | ✓ | [organizaciones](organizaciones.md) |
+| `GET /certificaciones` | ✓ | ✓ | [organizaciones](organizaciones.md) |
+| `GET /recursos/disponibilidad` y `GET /ongs/{cuit}/recursos/disponibilidad` | ✓ | ✓ | [organizaciones](organizaciones.md) |
+| `POST /ongs/{cuit}/inventario` | 403 | ✓ | [organizaciones](organizaciones.md) |
+| `POST /ongs/{cuit}/certificaciones` | 403 | ✓ | [organizaciones](organizaciones.md) |
+| `POST /ofertas/evaluacion` | ✓ | 403 | [evaluación de ofertas](evaluacion-ofertas.md) |
+| `POST /recursos/compromisos` y `POST /recursos/compromisos/validar` | ✓ | 403 | [compromisos](compromisos.md) |
+| `POST /recursos/compromisos/{id}/liberacion` | ✓ | 403 | [compromisos](compromisos.md) |
+| `POST /recursos/compromisos/{id}/ongs/{cuit}/liberacion` | ✓ | 403 | [compromisos](compromisos.md) |
+| `POST /recursos/compromisos/{id}/finalizacion` | ✓ | 403 | [compromisos](compromisos.md) |
 
 `GET /cuentas/yo` devuelve la cuenta y el rol del token, cuándo vence y las cabeceras de
 trazabilidad que la API aceptó: sirve para probar un token o la configuración del conector.
@@ -166,6 +175,13 @@ commitea. El secreto lo genera `flask cuentas crear ... --generar` ([sección 8]
 
 ### 7.2 Cada conector REST que llame a la API
 
+Hoy son tres: *Enviar ofertas* (`POST /ofertas/evaluacion`), *Liberar compromisos de emergencia*
+(`POST /recursos/compromisos/{id}/liberacion`) y *Finalizar emergencia en Sistema Nacional*
+(`POST /recursos/compromisos/{id}/finalizacion`). La liberación por ONG no es un conector REST sino
+un script Groovy (*Liberar compromisos de ONG no seleccionadas*) que recorre la lista
+`ongsNoSeleccionadas`: pide su propio token con un `POST /login` en formato client credentials
+(los mismos parámetros `snClientId` y `snClientSecret`) y llama a la liberación de cada ONG.
+
 En el asistente del conector (REST 1.5.x: GET, POST, PUT, PATCH o DELETE):
 
 1. **Authentication settings**: elegir **OAUTH2 (Client Credentials)** y completar:
@@ -195,11 +211,12 @@ En una tarea de servicio no hay usuario asignado (el conector manda
    `ultimoUsuario` ← *takes value of* script
    `apiAccessor.identityAPI.getUser(taskAssigneeId).userName`.
 
-| Llamada a la API | Tarea humana previa |
+| Tarea de servicio que llama a la API | Tarea humana previa |
 |---|---|
 | *Enviar ofertas a Sistema Nacional* (después del timer) | *Gestionar emergencia y publicar convocatoria* |
-| *Enviar compromiso* | *Seleccionar ofertas* |
-| *Informar finalización* | La última tarea de ejecución de las ONGs |
+| *Solicitar liberación de recursos reservados* (reinicio) | *Decidir acción ante cobertura insuficiente* |
+| *Liberar ofertas no seleccionadas* (script Groovy) | *Seleccionar ofertas* |
+| *Informar finalización* | *Esperar finalización de tareas* |
 
 Para que el valor sea la persona real, los actores del proceso tienen que estar mapeados a los
 usuarios de la aplicación web (hoy los tres actores están mapeados solo a `walter.bates`).
@@ -249,7 +266,7 @@ método lleva `requiere_rol` **arriba de todo**:
 ```python
 from app.core.acceso import Blueprint, Rol, actor_actual
 
-blueprint_compromisos = Blueprint("compromisos", __name__, url_prefix="/compromisos")
+blueprint_compromisos = Blueprint("compromisos", __name__, url_prefix="/recursos/compromisos")
 
 
 @blueprint_compromisos.route("")
@@ -274,6 +291,7 @@ class Compromisos(MethodView):
 
 - **Swagger** (`/docs`): *Authorize* ofrece `bearerAuth` (pegar el `access_token`) y `oauth2`
   (client id y secret; Swagger pide el token solo). El token sobrevive a recargar la página.
-- **Postman**: `docs/postman/` tiene la colección y los entornos `local` y `render`. Completar
-  las credenciales en el entorno y correr la colección en orden: los logins guardan los tokens en
-  variables que usan los demás pedidos.
+- **Postman**: `docs/postman/` tiene la colección, los entornos `local` y `render` y el manual
+  de pruebas en PDF. Completar las credenciales en el entorno y correr la colección en orden: los
+  logins guardan los tokens en variables que usan los demás pedidos. Las credenciales de la nube
+  para la evaluación están en la sección 3.3 del manual.

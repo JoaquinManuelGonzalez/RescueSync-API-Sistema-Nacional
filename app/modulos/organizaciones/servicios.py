@@ -8,6 +8,7 @@ identifican a una organización por su CUIT (`identificador_nacional`), no por s
 from __future__ import annotations
 
 import re
+import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
@@ -42,19 +43,38 @@ TRANSICIONES: dict[EstadoHabilitacion, frozenset[EstadoHabilitacion]] = {
 MOTIVO_ALTA = "Alta en el padrón nacional."
 
 
+def _cuit_con_formato(valor: str | None) -> str | None:
+    """El CUIT en formato NN-NNNNNNNN-N, o `None` si no son 11 dígitos con o sin guiones."""
+    digitos = re.sub(r"[\s-]", "", valor or "")
+    if not re.fullmatch(r"\d{11}", digitos):
+        return None
+    return f"{digitos[:2]}-{digitos[2:10]}-{digitos[10]}"
+
+
 def normalizar_cuit(valor: str) -> str:
     """Acepta 11 dígitos con o sin guiones y devuelve el formato NN-NNNNNNNN-N.
 
     No se valida el dígito verificador: los CUIT de demostración son ficticios y los comparte la
     aplicación web, que los usa como clave para cruzar sus organizaciones con el padrón.
     """
-    digitos = re.sub(r"[\s-]", "", valor or "")
-    if not re.fullmatch(r"\d{11}", digitos):
+    cuit = _cuit_con_formato(valor)
+    if cuit is None:
         raise SolicitudInvalida(
             "El CUIT tiene que tener 11 dígitos, con o sin guiones (por ejemplo 30-12345678-9).",
             detalle={"cuit": valor},
         )
-    return f"{digitos[:2]}-{digitos[2:10]}-{digitos[10]}"
+    return cuit
+
+
+def normalizar_identificador(valor: str) -> str:
+    """La clave con la que se busca en el padrón un CUIT que manda otro sistema.
+
+    A diferencia de `normalizar_cuit`, no rechaza lo que no tenga formato de CUIT: lo devuelve
+    recortado, para que la búsqueda no encuentre la organización y quien llama decida qué hacer
+    (la evaluación rechaza ese aporte; los compromisos responden 404). Así, un identificador mal
+    cargado en la web afecta solo a esa organización y no a toda la solicitud.
+    """
+    return _cuit_con_formato(valor) or valor.strip()
 
 
 def obtener_por_cuit(cuit: str) -> Organizacion:
@@ -163,21 +183,21 @@ def cambiar_estado_habilitacion(
     return organizacion
 
 
-def cargar_item(cuit: str, item_id: int, cantidad_disponible: int) -> InventarioItem:
+def cargar_item(cuit: str, item_id: uuid.UUID, cantidad_disponible: int) -> InventarioItem:
     """Agrega un ítem al inventario de una organización."""
     organizacion = obtener_por_cuit(cuit)
     item = db.session.get(Item, item_id)
     if item is None:
         raise RecursoNoEncontrado(
             "No hay ningún ítem con ese identificador.",
-            detalle={"item_id": item_id},
+            detalle={"item_id": str(item_id)},
         )
     if organizacion.inventario is None:
         organizacion.inventario = Inventario()
     if any(registro.item_id == item_id for registro in organizacion.inventario.items):
         raise ConflictoDeEstado(
             "La organización ya tiene cargado ese ítem.",
-            detalle={"item_id": item_id, "cuit": organizacion.identificador_nacional},
+            detalle={"item_id": str(item_id), "cuit": organizacion.identificador_nacional},
         )
     registro = InventarioItem(item=item, cantidad_disponible=cantidad_disponible)
     organizacion.inventario.items.append(registro)
@@ -186,7 +206,7 @@ def cargar_item(cuit: str, item_id: int, cantidad_disponible: int) -> Inventario
 
 
 def cargar_certificacion(
-    cuit: str, certificacion_id: int, nivel_certificacion: NivelCertificacion
+    cuit: str, certificacion_id: uuid.UUID, nivel_certificacion: NivelCertificacion
 ) -> OrganizacionCertificacion:
     """Asigna una certificación a una organización con su nivel."""
     organizacion = obtener_por_cuit(cuit)
@@ -194,7 +214,7 @@ def cargar_certificacion(
     if certificacion is None:
         raise RecursoNoEncontrado(
             "No hay ninguna certificación con ese identificador.",
-            detalle={"certificacion_id": certificacion_id},
+            detalle={"certificacion_id": str(certificacion_id)},
         )
     if any(
         asignacion.certificacion_id == certificacion_id
@@ -203,7 +223,7 @@ def cargar_certificacion(
         raise ConflictoDeEstado(
             "La organización ya tiene cargada esa certificación.",
             detalle={
-                "certificacion_id": certificacion_id,
+                "certificacion_id": str(certificacion_id),
                 "cuit": organizacion.identificador_nacional,
             },
         )

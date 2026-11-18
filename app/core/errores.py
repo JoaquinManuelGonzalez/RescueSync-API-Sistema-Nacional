@@ -150,6 +150,7 @@ MENSAJES_DE_VALIDACION: dict[str, str] = {
     "Field may not be null.": "No puede ser nulo.",
     "Not a valid string.": "Debe ser un texto.",
     "Not a valid integer.": "Debe ser un número entero.",
+    "Not a valid UUID.": "Debe ser un UUID válido.",
     "Not a valid email address.": "No es un correo electrónico válido.",
     "Invalid input type.": "Tipo de dato inválido.",
 }

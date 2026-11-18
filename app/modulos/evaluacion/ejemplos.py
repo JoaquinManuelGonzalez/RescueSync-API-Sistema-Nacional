@@ -1,7 +1,7 @@
 """Ejemplos de request y respuestas para evaluar ofertas desde Swagger."""
 
 EJEMPLO_EVALUACION_PRINCIPAL_Y_APOYO = {
-    "emergencia_id": 14,
+    "emergencia_id": "0193f4a2-7c1e-7e00-9e00-000000000014",
     "nivel_gravedad": "ALTA",
     "ofertas": [
         {
@@ -12,12 +12,12 @@ EJEMPLO_EVALUACION_PRINCIPAL_Y_APOYO = {
                         {
                             "cantidad": 2,
                             "identificador_nacional": "30-65432198-7",
-                            "organizacion_id": 6,
+                            "organizacion_id": "0193f4a2-7c1e-7c00-9c00-000000000006",
                         }
                     ],
                     "cantidad_total": 2,
                     "codigo_recurso": "RSR-PARAMEDICOS",
-                    "lote_item_id": 10,
+                    "lote_item_id": "0193f4a2-7c1e-7a00-9a00-000000000010",
                     "tipo_recurso": "personal_medico",
                     "unidad": "personas",
                 },
@@ -26,26 +26,26 @@ EJEMPLO_EVALUACION_PRINCIPAL_Y_APOYO = {
                         {
                             "cantidad": 2,
                             "identificador_nacional": "30-65432199-5",
-                            "organizacion_id": 7,
+                            "organizacion_id": "0193f4a2-7c1e-7c00-9c00-000000000007",
                         }
                     ],
                     "cantidad_total": 2,
                     "codigo_recurso": "RSR-FRAZADAS",
-                    "lote_item_id": 11,
+                    "lote_item_id": "0193f4a2-7c1e-7a00-9a00-000000000011",
                     "tipo_recurso": "abrigo",
                     "unidad": "unidades",
                 },
             ],
-            "oferta_id": 7,
+            "oferta_id": "0193f4a2-7c1e-7f00-9f00-000000000007",
             "organizaciones": [
                 {
-                    "id": 6,
+                    "id": "0193f4a2-7c1e-7c00-9c00-000000000006",
                     "identificador_nacional": "30-65432198-7",
                     "nombre": "Cruz Solidaria",
                     "rol": "aportante",
                 },
                 {
-                    "id": 7,
+                    "id": "0193f4a2-7c1e-7c00-9c00-000000000007",
                     "identificador_nacional": "30-65432199-5",
                     "nombre": "Manos Unidas",
                     "rol": "aportante",
@@ -57,12 +57,12 @@ EJEMPLO_EVALUACION_PRINCIPAL_Y_APOYO = {
 }
 
 EJEMPLO_RESPUESTA_PRINCIPAL_Y_APOYO = {
-    "emergencia_id": 14,
+    "emergencia_id": "0193f4a2-7c1e-7e00-9e00-000000000014",
     "nivel_gravedad": "ALTA",
     "ofertas": [
         {
             "fecha_creacion": "2026-10-16T14:40:44+00:00",
-            "oferta_id": 7,
+            "oferta_id": "0193f4a2-7c1e-7f00-9f00-000000000007",
             "organizaciones": EJEMPLO_EVALUACION_PRINCIPAL_Y_APOYO["ofertas"][0]["organizaciones"],
             "items": [
                 {
@@ -70,7 +70,7 @@ EJEMPLO_RESPUESTA_PRINCIPAL_Y_APOYO = {
                         {
                             "cantidad": 2,
                             "identificador_nacional": "30-65432198-7",
-                            "organizacion_id": 6,
+                            "organizacion_id": "0193f4a2-7c1e-7c00-9c00-000000000006",
                             "certificacion_encontrada": True,
                             "nivel_riesgo_permitido": "alta",
                             "clasificacion": "principal",
@@ -80,7 +80,7 @@ EJEMPLO_RESPUESTA_PRINCIPAL_Y_APOYO = {
                     ],
                     "cantidad_total": 2,
                     "codigo_recurso": "RSR-PARAMEDICOS",
-                    "lote_item_id": 10,
+                    "lote_item_id": "0193f4a2-7c1e-7a00-9a00-000000000010",
                     "tipo_recurso": "personal_medico",
                     "unidad": "personas",
                     "consumible": False,
@@ -90,7 +90,7 @@ EJEMPLO_RESPUESTA_PRINCIPAL_Y_APOYO = {
                         {
                             "cantidad": 2,
                             "identificador_nacional": "30-65432199-5",
-                            "organizacion_id": 7,
+                            "organizacion_id": "0193f4a2-7c1e-7c00-9c00-000000000007",
                             "certificacion_encontrada": True,
                             "nivel_riesgo_permitido": "media",
                             "clasificacion": "apoyo",
@@ -103,7 +103,7 @@ EJEMPLO_RESPUESTA_PRINCIPAL_Y_APOYO = {
                     ],
                     "cantidad_total": 2,
                     "codigo_recurso": "RSR-FRAZADAS",
-                    "lote_item_id": 11,
+                    "lote_item_id": "0193f4a2-7c1e-7a00-9a00-000000000011",
                     "tipo_recurso": "abrigo",
                     "unidad": "unidades",
                     "consumible": True,
@@ -114,15 +114,15 @@ EJEMPLO_RESPUESTA_PRINCIPAL_Y_APOYO = {
 }
 
 EJEMPLO_RESPUESTA_ORGANIZACION_NO_REGISTRADA = {
-    "emergencia_id": 15,
+    "emergencia_id": "0193f4a2-7c1e-7e00-9e00-000000000015",
     "nivel_gravedad": "ALTA",
     "ofertas": [
         {
             "fecha_creacion": "2026-10-20T12:00:00+00:00",
-            "oferta_id": 8,
+            "oferta_id": "0193f4a2-7c1e-7f00-9f00-000000000008",
             "organizaciones": [
                 {
-                    "id": 6,
+                    "id": "0193f4a2-7c1e-7c00-9c00-000000000006",
                     "identificador_nacional": "30-65432198-7",
                     "nombre": "Cruz Solidaria",
                     "rol": "aportante",
@@ -134,7 +134,7 @@ EJEMPLO_RESPUESTA_ORGANIZACION_NO_REGISTRADA = {
                         {
                             "cantidad": 1,
                             "identificador_nacional": "30-00000000-0",
-                            "organizacion_id": 999,
+                            "organizacion_id": "0193f4a2-7c1e-7c00-9c00-000000000999",
                             "certificacion_encontrada": False,
                             "nivel_riesgo_permitido": None,
                             "clasificacion": "rechazada",
@@ -144,7 +144,7 @@ EJEMPLO_RESPUESTA_ORGANIZACION_NO_REGISTRADA = {
                     ],
                     "cantidad_total": 1,
                     "codigo_recurso": "RSR-ENFERMEROS",
-                    "lote_item_id": 11,
+                    "lote_item_id": "0193f4a2-7c1e-7a00-9a00-000000000011",
                     "tipo_recurso": "personal_medico",
                     "unidad": "personas",
                     "consumible": False,
@@ -155,15 +155,15 @@ EJEMPLO_RESPUESTA_ORGANIZACION_NO_REGISTRADA = {
 }
 
 EJEMPLO_RESPUESTA_STOCK_INSUFICIENTE = {
-    "emergencia_id": 16,
+    "emergencia_id": "0193f4a2-7c1e-7e00-9e00-000000000016",
     "nivel_gravedad": "ALTA",
     "ofertas": [
         {
             "fecha_creacion": "2026-10-20T17:00:00+00:00",
-            "oferta_id": 9,
+            "oferta_id": "0193f4a2-7c1e-7f00-9f00-000000000009",
             "organizaciones": [
                 {
-                    "id": 6,
+                    "id": "0193f4a2-7c1e-7c00-9c00-000000000006",
                     "identificador_nacional": "30-65432198-7",
                     "nombre": "Cruz Solidaria",
                     "rol": "aportante",
@@ -175,7 +175,7 @@ EJEMPLO_RESPUESTA_STOCK_INSUFICIENTE = {
                         {
                             "cantidad": 11,
                             "identificador_nacional": "30-65432198-7",
-                            "organizacion_id": 6,
+                            "organizacion_id": "0193f4a2-7c1e-7c00-9c00-000000000006",
                             "certificacion_encontrada": True,
                             "nivel_riesgo_permitido": "alta",
                             "clasificacion": "rechazada",
@@ -188,7 +188,7 @@ EJEMPLO_RESPUESTA_STOCK_INSUFICIENTE = {
                     ],
                     "cantidad_total": 11,
                     "codigo_recurso": "RSR-PARAMEDICOS",
-                    "lote_item_id": 12,
+                    "lote_item_id": "0193f4a2-7c1e-7a00-9a00-000000000012",
                     "tipo_recurso": "personal_medico",
                     "unidad": "personas",
                     "consumible": False,
@@ -199,15 +199,15 @@ EJEMPLO_RESPUESTA_STOCK_INSUFICIENTE = {
 }
 
 EJEMPLO_RESPUESTA_SIN_CERTIFICACION = {
-    "emergencia_id": 17,
+    "emergencia_id": "0193f4a2-7c1e-7e00-9e00-000000000017",
     "nivel_gravedad": "ALTA",
     "ofertas": [
         {
             "fecha_creacion": "2026-10-20T17:00:00+00:00",
-            "oferta_id": 10,
+            "oferta_id": "0193f4a2-7c1e-7f00-9f00-000000000010",
             "organizaciones": [
                 {
-                    "id": 6,
+                    "id": "0193f4a2-7c1e-7c00-9c00-000000000006",
                     "identificador_nacional": "30-65432198-7",
                     "nombre": "Cruz Solidaria",
                     "rol": "aportante",
@@ -219,7 +219,7 @@ EJEMPLO_RESPUESTA_SIN_CERTIFICACION = {
                         {
                             "cantidad": 1,
                             "identificador_nacional": "30-65432198-7",
-                            "organizacion_id": 6,
+                            "organizacion_id": "0193f4a2-7c1e-7c00-9c00-000000000006",
                             "certificacion_encontrada": False,
                             "nivel_riesgo_permitido": None,
                             "clasificacion": "rechazada",
@@ -229,7 +229,7 @@ EJEMPLO_RESPUESTA_SIN_CERTIFICACION = {
                     ],
                     "cantidad_total": 1,
                     "codigo_recurso": "RSR-FRAZADAS",
-                    "lote_item_id": 13,
+                    "lote_item_id": "0193f4a2-7c1e-7a00-9a00-000000000013",
                     "tipo_recurso": "abrigo",
                     "unidad": "unidades",
                     "consumible": True,

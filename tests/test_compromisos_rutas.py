@@ -17,8 +17,12 @@ from app.modulos.organizaciones.modelos import (
     TipoOrganizacion,
 )
 
+# Los ids de emergencia son UUID: la web los genera y no se repiten entre entornos.
+EMERGENCIA = "0193f4a2-7c1e-7b5d-9a3f-2e8c4b6d0042"
+EMERGENCIA_SIN_COMPROMISOS = "0193f4a2-7c1e-7b5d-9a3f-2e8c4b6d0000"
+
 PETICION = {
-    "emergencia_externa_id": "emergencia-42",
+    "emergencia_externa_id": EMERGENCIA,
     "nivel_gravedad": "MEDIA",
     "aportes": [
         {
@@ -72,7 +76,7 @@ def test_post_compromete_recursos_y_devuelve_el_resumen(
 
     assert respuesta.status_code == 201
     assert respuesta.get_json() == {
-        "emergencia_externa_id": "emergencia-42",
+        "emergencia_externa_id": EMERGENCIA,
         "repetido": False,
         "compromisos": [
             {
@@ -188,17 +192,17 @@ def test_liberar_recursos_devuelve_inventario_y_es_idempotente(
     )
 
     primera = cliente.post(
-        "/recursos/compromisos/emergencia-42/liberacion",
+        f"/recursos/compromisos/{EMERGENCIA}/liberacion",
         headers=cabeceras(Rol.sistema),
     )
     segunda = cliente.post(
-        "/recursos/compromisos/emergencia-42/liberacion",
+        f"/recursos/compromisos/{EMERGENCIA}/liberacion",
         headers=cabeceras(Rol.sistema),
     )
 
     assert primera.status_code == 200
     assert primera.get_json() == {
-        "emergencia_externa_id": "emergencia-42",
+        "emergencia_externa_id": EMERGENCIA,
         "repetido": False,
         "compromisos": [
             {
@@ -227,7 +231,7 @@ def test_reinicio_convocatoria_permite_volver_a_comprometer(
     inventario_disponible,
 ):
     endpoint_compromisos = "/recursos/compromisos"
-    endpoint_liberacion = "/recursos/compromisos/emergencia-42/liberacion"
+    endpoint_liberacion = f"/recursos/compromisos/{EMERGENCIA}/liberacion"
 
     primera = cliente.post(
         endpoint_compromisos,
@@ -251,21 +255,25 @@ def test_reinicio_convocatoria_permite_volver_a_comprometer(
 
 def test_liberar_recursos_requiere_rol_sistema(cliente, cabeceras):
     respuesta = cliente.post(
-        "/recursos/compromisos/emergencia-42/liberacion",
+        f"/recursos/compromisos/{EMERGENCIA}/liberacion",
         headers=cabeceras(Rol.administrador),
     )
 
     assert respuesta.status_code == 403
 
 
-def test_liberar_recursos_sin_compromisos_responde_404(cliente, cabeceras):
+def test_liberar_recursos_sin_compromisos_responde_200_vacio(cliente, cabeceras):
     respuesta = cliente.post(
-        "/recursos/compromisos/emergencia-inexistente/liberacion",
+        f"/recursos/compromisos/{EMERGENCIA_SIN_COMPROMISOS}/liberacion",
         headers=cabeceras(Rol.sistema),
     )
 
-    assert respuesta.status_code == 404
-    assert respuesta.get_json()["error"]["codigo"] == "RECURSO_NO_ENCONTRADO"
+    assert respuesta.status_code == 200
+    assert respuesta.get_json() == {
+        "emergencia_externa_id": EMERGENCIA_SIN_COMPROMISOS,
+        "repetido": False,
+        "compromisos": [],
+    }
 
 
 def test_liberar_recursos_de_ong_es_idempotente(cliente, cabeceras, inventario_disponible):
@@ -274,7 +282,7 @@ def test_liberar_recursos_de_ong_es_idempotente(cliente, cabeceras, inventario_d
         json=PETICION,
         headers=cabeceras(Rol.sistema),
     )
-    endpoint = "/recursos/compromisos/emergencia-42/ongs/30-11111111-1/liberacion"
+    endpoint = f"/recursos/compromisos/{EMERGENCIA}/ongs/30-11111111-1/liberacion"
 
     primera = cliente.post(endpoint, headers=cabeceras(Rol.sistema))
     segunda = cliente.post(endpoint, headers=cabeceras(Rol.sistema))
@@ -288,7 +296,7 @@ def test_liberar_recursos_de_ong_es_idempotente(cliente, cabeceras, inventario_d
 
 def test_liberar_recursos_de_ong_requiere_rol_sistema(cliente, cabeceras):
     respuesta = cliente.post(
-        "/recursos/compromisos/emergencia-42/ongs/30-11111111-1/liberacion",
+        f"/recursos/compromisos/{EMERGENCIA}/ongs/30-11111111-1/liberacion",
         headers=cabeceras(Rol.administrador),
     )
 
@@ -297,7 +305,7 @@ def test_liberar_recursos_de_ong_requiere_rol_sistema(cliente, cabeceras):
 
 def test_liberar_recursos_de_ong_sin_compromiso_responde_404(cliente, cabeceras):
     respuesta = cliente.post(
-        "/recursos/compromisos/emergencia-42/ongs/30-11111111-1/liberacion",
+        f"/recursos/compromisos/{EMERGENCIA}/ongs/30-11111111-1/liberacion",
         headers=cabeceras(Rol.sistema),
     )
 
@@ -317,13 +325,13 @@ def test_finalizacion_global_cierra_emergencia_y_devuelve_el_estado(
     )
 
     respuesta = cliente.post(
-        "/recursos/compromisos/emergencia-42/finalizacion",
+        f"/recursos/compromisos/{EMERGENCIA}/finalizacion",
         headers=cabeceras(Rol.sistema),
     )
 
     assert respuesta.status_code == 200
     assert respuesta.get_json() == {
-        "emergencia_externa_id": "emergencia-42",
+        "emergencia_externa_id": EMERGENCIA,
         "proyecto_cerrado": True,
         "organizaciones_finalizadas": 1,
         "organizaciones_participantes": 1,
@@ -339,7 +347,7 @@ def test_finalizacion_global_es_idempotente(cliente, cabeceras, inventario_dispo
         json=PETICION,
         headers=cabeceras(Rol.sistema),
     )
-    endpoint = "/recursos/compromisos/emergencia-42/finalizacion"
+    endpoint = f"/recursos/compromisos/{EMERGENCIA}/finalizacion"
 
     primera = cliente.post(endpoint, headers=cabeceras(Rol.sistema))
     segunda = cliente.post(endpoint, headers=cabeceras(Rol.sistema))
@@ -352,7 +360,7 @@ def test_finalizacion_global_es_idempotente(cliente, cabeceras, inventario_dispo
 
 def test_finalizacion_global_requiere_rol_sistema(cliente, cabeceras):
     respuesta = cliente.post(
-        "/recursos/compromisos/emergencia-42/finalizacion",
+        f"/recursos/compromisos/{EMERGENCIA}/finalizacion",
         headers=cabeceras(Rol.administrador),
     )
 
@@ -361,7 +369,7 @@ def test_finalizacion_global_requiere_rol_sistema(cliente, cabeceras):
 
 def test_finalizacion_global_sin_compromisos_responde_404(cliente, cabeceras):
     respuesta = cliente.post(
-        "/recursos/compromisos/emergencia-42/finalizacion",
+        f"/recursos/compromisos/{EMERGENCIA}/finalizacion",
         headers=cabeceras(Rol.sistema),
     )
 
@@ -545,3 +553,49 @@ def test_validar_recursos_recurso_no_declarado_responde_valido_false(
     datos = respuesta.get_json()
     assert datos["valido"] is False
     assert any(m["motivo"] == "recurso_no_declarado" for m in datos["motivos"])
+
+
+def test_post_rechaza_una_emergencia_que_no_es_uuid(cliente, cabeceras, inventario_disponible):
+    # Un id entero o de texto libre puede repetirse entre las webs que usan la misma API.
+    respuesta = cliente.post(
+        "/recursos/compromisos",
+        json={**PETICION, "emergencia_externa_id": "1"},
+        headers=cabeceras(Rol.sistema),
+    )
+
+    assert respuesta.status_code == 400
+    assert respuesta.get_json()["error"]["detalle"] == {
+        "json": {"emergencia_externa_id": ["Debe ser un UUID válido."]}
+    }
+    assert db.session.query(Compromiso).count() == 0
+
+
+@pytest.mark.parametrize("accion", ["liberacion", "finalizacion", "ongs/30-11111111-1/liberacion"])
+def test_las_acciones_sobre_una_emergencia_que_no_es_uuid_responden_404(cliente, cabeceras, accion):
+    respuesta = cliente.post(
+        f"/recursos/compromisos/emergencia-42/{accion}",
+        headers=cabeceras(Rol.sistema),
+    )
+
+    assert respuesta.status_code == 404
+    assert respuesta.get_json()["error"]["codigo"] == "RECURSO_NO_ENCONTRADO"
+
+
+def test_el_uuid_de_la_emergencia_se_guarda_en_forma_canonica(
+    cliente, cabeceras, inventario_disponible
+):
+    # Bonita puede mandarlo en mayúsculas; liberar con la forma canónica tiene que encontrarlo.
+    alta = cliente.post(
+        "/recursos/compromisos",
+        json={**PETICION, "emergencia_externa_id": EMERGENCIA.upper()},
+        headers=cabeceras(Rol.sistema),
+    )
+    liberacion = cliente.post(
+        f"/recursos/compromisos/{EMERGENCIA}/liberacion",
+        headers=cabeceras(Rol.sistema),
+    )
+
+    assert alta.status_code == 201
+    assert alta.get_json()["emergencia_externa_id"] == EMERGENCIA
+    assert db.session.query(Compromiso).one().emergencia_externa_id == EMERGENCIA
+    assert liberacion.get_json()["compromisos"][0]["estado"] == "LIBERADO"

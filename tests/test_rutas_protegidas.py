@@ -23,6 +23,9 @@ RUTAS_PUBLICAS = frozenset(
     }
 )
 METODOS_IGNORADOS = frozenset({"HEAD", "OPTIONS"})
+# Valor de relleno para cualquier parámetro de ruta: tiene forma de UUID para que también
+# entre en las rutas con `<uuid:...>`, y sirve como texto para las de `<string:...>`.
+VALOR_DE_RELLENO = "00000000-0000-7000-8000-000000000001"
 
 
 def _rutas_privadas(app):
@@ -31,7 +34,7 @@ def _rutas_privadas(app):
             continue
         for metodo in sorted(regla.methods - METODOS_IGNORADOS):
             # Los parámetros se completan con un valor cualquiera: sin token no se llega a usarlos.
-            yield metodo, re.sub(r"<(?:[^:>]+:)?[^>]+>", "1", regla.rule)
+            yield metodo, re.sub(r"<(?:[^:>]+:)?[^>]+>", VALOR_DE_RELLENO, regla.rule)
 
 
 def test_todas_las_rutas_privadas_exigen_token(app, cliente, base_de_datos):

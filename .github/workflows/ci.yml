@@ -85,6 +85,8 @@ jobs:
         run: |
           curl --fail --silent --show-error localhost:8000/health
           docker compose exec -T api flask db current | grep -q "(head)"
+          # El esquema que dejan las migraciones coincide con los modelos (sin diferencias).
+          docker compose exec -T api flask db check
           docker compose exec -T api flask seed > "$RUNNER_TEMP/seed.log"
           cat "$RUNNER_TEMP/seed.log"
           grep -q "organizaciones/organizaciones: 0 creados" "$RUNNER_TEMP/seed.log"

@@ -23,10 +23,17 @@
       tablas, columnas, rutas, ramas).
 - [ ] Los commits siguen Conventional Commits y referencian la HU (`(HU-XX)`).
 - [ ] Si se agregó una migración, se probó `flask db upgrade` y `downgrade` contra PostgreSQL (no
-      solo SQLite). Si borra tablas o columnas, se aclara en el PR: Supabase Free no tiene
-      backups.
+      solo SQLite) y `flask db check` no encuentra diferencias. Si transforma o borra datos, se
+      probó con una copia de Supabase y se aclara en el PR: Supabase Free no tiene backups.
+- [ ] Las tablas y foráneas nuevas usan UUID (`Uuid`, `default=nuevo_id`); las rutas con ids,
+      `<uuid:...>` (CONTRIBUTING, "Identificadores").
 - [ ] Si se agregó una variable de entorno: está en `.env.example`, en
       `docs/contratos/configuracion.md`, en la tabla del README y, si aplica, en `render.yaml`.
+- [ ] Si cambia un endpoint: están al día su contrato en `docs/contratos/`, los ejemplos de
+      Swagger, la tabla de endpoints del README y la matriz de permisos. Si cambia la colección
+      Postman, se corrió dos veces seguidas sobre la misma base y se regeneró el manual.
+- [ ] Si el cambio es incompatible con la web o con Bonita, los commits llevan `BREAKING CHANGE:`
+      y el PR enlaza los de los otros repositorios, para mergearlos juntos.
 - [ ] La documentación relacionada (README, ADR, contratos) está actualizada si el cambio la
       afecta.
 - [ ] No se commitean secretos, archivos `.env` ni credenciales.

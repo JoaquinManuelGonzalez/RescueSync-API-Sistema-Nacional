@@ -31,7 +31,10 @@ class AporteCompromiso(Schema):
 
 
 class PeticionCompromiso(Schema):
-    emergencia_externa_id = fields.String(required=True, validate=validate.Length(min=1, max=255))
+    emergencia_externa_id = fields.UUID(
+        required=True,
+        metadata={"description": "UUID de la emergencia en la aplicación web."},
+    )
     nivel_gravedad = fields.String(
         required=True,
         validate=validate.OneOf(NIVELES_GRAVEDAD_ACEPTADOS),
@@ -72,7 +75,7 @@ class CompromisoRespuesta(Schema):
 
 
 class RespuestaCompromiso(Schema):
-    emergencia_externa_id = fields.String(required=True)
+    emergencia_externa_id = fields.UUID(required=True)
     repetido = fields.Boolean(required=True)
     compromisos = fields.List(fields.Nested(CompromisoRespuesta), required=True)
 
@@ -82,7 +85,7 @@ class RespuestaLiberacion(RespuestaCompromiso):
 
 
 class RespuestaFinalizacion(Schema):
-    emergencia_externa_id = fields.String(required=True)
+    emergencia_externa_id = fields.UUID(required=True)
     proyecto_cerrado = fields.Boolean(required=True)
     organizaciones_finalizadas = fields.Integer(required=True)
     organizaciones_participantes = fields.Integer(required=True)

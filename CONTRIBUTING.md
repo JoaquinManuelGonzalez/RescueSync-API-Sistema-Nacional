@@ -13,8 +13,8 @@ commit.
 4. Entorno local, formato y verificación (uv + Ruff)
 5. Nomenclatura de ramas
 6. Commits y vínculo con el backlog
-7. Flujo de trabajo actual: rama de épica
-8. Pase a `main` y revisión obligatoria
+7. Flujo de trabajo: rama corta y Pull Request
+8. Revisión obligatoria y protección de `main`
 9. Despliegue continuo
 
 ## 1. Idioma del código
@@ -39,11 +39,11 @@ Las excepciones se nombran con la palabra adelante: `ErrorDeAplicacion`, no
 | Variables | `snake_case` | `cantidad_reservada` |
 | Constantes | `MAYUSCULAS_CON_GUION_BAJO` | `ESTADOS_DE_RESERVA` |
 | Blueprints / endpoints | `modulo.accion` | `compromisos.crear` |
-| Rutas URL | minúsculas con guion medio | `/recursos/compromisos`, `/ongs/{id}/habilitacion` |
+| Rutas URL | minúsculas con guion medio | `/recursos/compromisos`, `/ongs/{cuit}/habilitacion` |
 | Tablas | `snake_case` plural | `compromisos_de_recursos` |
 | Columnas | `snake_case` singular | `tipo_de_recurso` |
-| Clave primaria | siempre `id` | `id` |
-| Clave foránea | `<tabla_en_singular>_id` | `ong_id` |
+| Clave primaria | siempre `id`, UUID | `id` |
+| Clave foránea | atributo `<entidad>_id`, columna `id_<entidad>` (como en el diagrama), UUID | `organizacion_id` → `id_organizacion` |
 | Booleanos | prefijo `es_` / `tiene_` | `es_habilitada` |
 | Fechas | prefijo `fecha_` | `fecha_creacion` |
 | Índices y restricciones | `ix_`/`uq_`/`fk_`/`ck_` + tabla + columnas | `ix_compromisos_de_recursos_ong_id` |
@@ -51,6 +51,24 @@ Las excepciones se nombran con la palabra adelante: `ErrorDeAplicacion`, no
 
 La convención de nombres de índices y restricciones está declarada en `app/extensiones.py`:
 Alembic genera esos nombres solo, sin que haya que escribirlos a mano.
+
+### Identificadores
+
+Todas las claves son UUID ([ADR-006](docs/adr/ADR-006-claves-uuid.md)). Varias aplicaciones web
+locales usan la misma API, y con enteros la emergencia `1` de una pisaba la de otra.
+
+- Una tabla nueva declara `id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True,
+  default=nuevo_id)`, con `nuevo_id` de `app/core/identificadores.py` (UUIDv7: ordenar por `id`
+  sigue siendo ordenar por fecha de alta). Las foráneas usan `Uuid`.
+- Un ítem o una certificación nueva del catálogo toma su id de `id_de_item(codigo)` o
+  `id_de_certificacion(nombre, tipo)` en la semilla, nunca de `nuevo_id`: así tiene el mismo id en
+  todas las bases y los ejemplos de Swagger y Postman siguen valiendo. El espacio de nombres
+  `ESPACIO_SISTEMA_NACIONAL` no se cambia nunca.
+- Las rutas con un id usan `<uuid:...>` (un id mal formado es 404) y los schemas, `fields.UUID`
+  (400). Un id de otro sistema que se guarda como texto, como `emergencia_externa_id`, se guarda en
+  forma canónica con `str(uuid)`.
+- Los ejemplos de Swagger y de la colección usan UUID: los del catálogo, con `id_de_item` /
+  `id_de_certificacion`; los demás pueden ser ilustrativos.
 
 ## 3. Estructura de carpetas
 
@@ -72,8 +90,9 @@ migrations/          migraciones de Alembic (Flask-Migrate)
 tests/
 docs/
   adr/               decisiones de arquitectura
-  contratos/         contratos de autenticacion, configuracion, errores y logging
-  postman/           coleccion y entornos de Postman
+  contratos/         contratos: autenticacion, organizaciones, evaluacion de ofertas,
+                     compromisos, configuracion, errores y logging
+  postman/           coleccion, entornos, manual de pruebas (PDF) y su generador
 ```
 
 - Una entidad de dominio nueva va en `modelos.py` del módulo dueño, y se agrega a
@@ -83,6 +102,9 @@ docs/
 - Todo endpoint usa el `Blueprint` de `app.core.acceso` y cada método lleva
   `@blp.requiere_rol(...)` **arriba de todo** (`docs/contratos/autenticacion.md`, sección 9).
   `tests/test_rutas_protegidas.py` falla si una ruta responde sin token.
+- Un endpoint nuevo o un cambio de contrato actualiza en el mismo PR: el contrato de
+  `docs/contratos/`, los ejemplos de Swagger, la tabla de endpoints del README, la matriz de
+  permisos de `autenticacion.md` y, si aplica, la colección Postman y su manual.
 
 ## 4. Entorno local, formato y verificación (uv + Ruff)
 
@@ -113,7 +135,12 @@ uv run pytest                  # tests
 ```
 
 Lo mismo se puede correr dentro del contenedor: `docker compose exec api ruff check .`. El CI
-corre exactamente estos comandos (ver sección 9).
+corre exactamente estos comandos y, además, levanta `docker compose`, verifica que el esquema
+migrado coincida con los modelos (`flask db check`) y construye la imagen de producción (ver
+sección 9).
+
+> En Windows con el Control de aplicaciones activado, los lanzadores `.exe` de `.venv\Scripts`
+> pueden estar bloqueados (`os error 4551`). En ese caso: `uv run python -m pytest`.
 
 ## 5. Nomenclatura de ramas
 
@@ -151,43 +178,44 @@ docs(readme): documenta runbook de pausa de supabase [skip render] (HU-SN-07)
 Los commits que solo tocan documentación llevan `[skip render]` en el mensaje para que Render
 no dispare un deploy innecesario (ver sección 9).
 
-## 7. Flujo de trabajo actual: rama de épica
+## 7. Flujo de trabajo: rama corta y Pull Request
 
-Durante la épica **EPIC-SN-01 (Dockerización y despliegue en la nube)** el equipo trabaja en
-una única rama, sin Pull Requests contra `main`:
+Cada HU (o cada tanda de arreglos relacionados) se trabaja en una rama corta que sale de `main`
+actualizada y vuelve por Pull Request:
 
 ```bash
-git checkout feat/EPIC-SN-01-dockerizacion-y-despliegue
-git pull
+git switch main && git pull
+git switch -c fix/HU-SN-12-reserva-duplicada
+git branch --unset-upstream    # si la rama quedó siguiendo a origin/main
 
 # ... cambios ...
 uv run ruff format --check . && uv run ruff check . && uv run pytest
 
 git add <archivos>
-git commit -m "feat(docker): agrega docker-compose con api y postgres (HU-SN-03)"
-git push
+git commit -m "fix(compromisos): rechaza la reserva duplicada (HU-SN-12)"
+git push -u origin fix/HU-SN-12-reserva-duplicada
 ```
 
-Durante la épica, Render estuvo vinculado a esta rama. Desde el pase a `main` (sección 8)
-despliega solo lo que se mergea en `main` con el CI en verde (sección 9).
+Después se abre el PR contra `main` con la plantilla de `.github/pull_request_template.md`. Un
+cambio incompatible (por ejemplo, un contrato que deja de aceptar lo que mandan la web o Bonita)
+lleva `BREAKING CHANGE:` en el pie del commit y se coordina con los otros repositorios: se mergea
+el mismo día que sus contrapartes.
 
-## 8. Pase a `main` y revisión obligatoria
+> **Historia.** Durante la épica EPIC-SN-01 (dockerización y despliegue) el equipo trabajó en una
+> única rama de épica sin Pull Requests, y Render estaba vinculado a ella. Desde el pase a `main`
+> rige el flujo de esta sección.
 
-Cuando el equipo decida integrar la épica a `main`, se aplican las reglas de la aplicación web:
+## 8. Revisión obligatoria y protección de `main`
 
 - `main` está reservada a código entregable: **no se hace push directo**.
-- Todo cambio entra por Pull Request, usando la plantilla de `.github/pull_request_template.md`.
+- Todo cambio entra por Pull Request, usando la plantilla.
 - Mínimo **1 aprobación** de otro integrante; prohibido auto-aprobarse.
-- Merge siempre por **squash**, con la rama al día con `main`.
+- Merge siempre por **squash**, con la rama al día con `main` y los checks `calidad` e `imagen`
+  en verde.
 - Las ramas se borran apenas se mergean.
 
-Pasos del pase a `main`:
-
-1. Abrir el PR de la rama de épica contra `main` con `gh pr create --base main`.
-2. En el mismo PR, cambiar el campo `branch:` del servicio en `render.yaml` a `main`.
-3. Después del merge, en Render: **Blueprint → Settings**, cambiar la rama vinculada a `main`
-   y hacer **Manual Sync**.
-4. Activar la protección de `main` (una sola vez, requiere permisos de admin del repo):
+La protección de `main` está configurada en GitHub (**Settings → Branches**). Como referencia, la
+misma configuración por API (requiere permisos de administración del repositorio):
 
 ```bash
 # Solo squash merge, y borrar la rama al mergear
@@ -207,9 +235,6 @@ gh api -X PUT repos/JoaquinManuelGonzalez/RescueSync-API-Sistema-Nacional/branch
 JSON
 ```
 
-A partir de ahí el flujo por HU es el de la aplicación web: rama corta desde `main`
-actualizada, PR con la plantilla, aprobación, squash.
-
 ## 9. Despliegue continuo
 
 - La infraestructura de Render está declarada como código en `render.yaml` (Blueprint). Un
@@ -221,10 +246,13 @@ actualizada, PR con la plantilla, aprobación, squash.
 - Los cambios que solo tocan `docs/**` o archivos `.md` no disparan deploy (`buildFilter`).
   Para otros commits sin impacto se puede usar `[skip render]` en el mensaje.
 - Las migraciones de Alembic corren solas al arrancar el contenedor (`entrypoint.sh`), también
-  contra Supabase en cada deploy. Una migración que falla aborta el arranque y Render mantiene
-  la versión anterior. El esquema de la nube se cambia **solo** con migraciones: nunca a mano
-  desde el dashboard de Supabase (flujo completo y reglas en el README, "Base de datos: local y
-  nube").
+  contra Supabase en cada deploy, y después corre `flask seed`. Una migración que falla aborta el
+  arranque y Render mantiene la versión anterior. El esquema de la nube se cambia **solo** con
+  migraciones: nunca a mano desde el dashboard de Supabase (flujo completo y reglas en el README,
+  "Base de datos: local y nube").
+- Una migración que transforma datos se prueba antes con una copia de Supabase (`pg_dump` en un
+  PostgreSQL descartable), en los dos sentidos. Supabase Free no tiene backups: antes de
+  desplegarla se guarda un `pg_dump`.
 - La base de datos no está en Render sino en Supabase (ADR-004): su configuración se hace en el
   dashboard de Supabase, y `DATABASE_URL` se carga a mano en el dashboard de Render.
 - Nunca se commitean secretos: los valores sensibles viven en Render (variables generadas o

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 
 from app.extensiones import db
 from app.modulos.compromisos.modelos import Compromiso, TipoAsignacion
-from app.modulos.evaluacion.servicios import evaluar_ofertas
+from app.modulos.evaluacion.servicios import MOTIVO_SIN_IDENTIFICADOR, evaluar_ofertas
 from app.modulos.organizaciones.modelos import (
     Certificacion,
     EstadoHabilitacion,
@@ -70,13 +71,14 @@ def test_evaluacion_clasifica_cada_item_y_compromete_no_consumibles(base_de_dato
     db.session.add_all([ambulancia, agua, cert_rescate, cert_agua, organizacion])
     db.session.commit()
 
+    emergencia_id = uuid.uuid7()
     resultado = evaluar_ofertas(
-        emergencia_id=14,
+        emergencia_id=emergencia_id,
         nivel_gravedad="ALTA",
         ofertas=[
             {
                 "fecha_creacion": datetime.now(UTC),
-                "oferta_id": 7,
+                "oferta_id": uuid.uuid7(),
                 "organizaciones": [],
                 "version": 2,
                 "items": [
@@ -85,12 +87,12 @@ def test_evaluacion_clasifica_cada_item_y_compromete_no_consumibles(base_de_dato
                             {
                                 "cantidad": 5,
                                 "identificador_nacional": organizacion.identificador_nacional,
-                                "organizacion_id": 999,
+                                "organizacion_id": uuid.uuid7(),
                             }
                         ],
                         "cantidad_total": 5,
                         "codigo_recurso": ambulancia.codigo_recurso,
-                        "lote_item_id": 10,
+                        "lote_item_id": uuid.uuid7(),
                         "tipo_recurso": "rescate",
                         "unidad": "unidades",
                     },
@@ -99,12 +101,12 @@ def test_evaluacion_clasifica_cada_item_y_compromete_no_consumibles(base_de_dato
                             {
                                 "cantidad": 100,
                                 "identificador_nacional": organizacion.identificador_nacional,
-                                "organizacion_id": 999,
+                                "organizacion_id": uuid.uuid7(),
                             }
                         ],
                         "cantidad_total": 100,
                         "codigo_recurso": agua.codigo_recurso,
-                        "lote_item_id": 11,
+                        "lote_item_id": uuid.uuid7(),
                         "tipo_recurso": "agua",
                         "unidad": "litros",
                     },
@@ -123,6 +125,8 @@ def test_evaluacion_clasifica_cada_item_y_compromete_no_consumibles(base_de_dato
     assert items[0]["aportes"][0]["compromiso_registrado"] is True
     assert db.session.query(Compromiso).count() == 1
     assert db.session.query(Compromiso).one().items[0].tipo_asignacion is TipoAsignacion.apoyo
+    # Queda bajo el UUID en forma canónica, la misma que usan liberación y finalización.
+    assert db.session.query(Compromiso).one().emergencia_externa_id == str(emergencia_id)
 
 
 def test_evaluacion_rechaza_sin_certificacion_y_por_stock_insuficiente(base_de_datos):
@@ -149,12 +153,12 @@ def test_evaluacion_rechaza_sin_certificacion_y_por_stock_insuficiente(base_de_d
     db.session.commit()
 
     resultado = evaluar_ofertas(
-        emergencia_id=15,
+        emergencia_id=uuid.uuid7(),
         nivel_gravedad="BAJA",
         ofertas=[
             {
                 "fecha_creacion": datetime.now(UTC),
-                "oferta_id": 8,
+                "oferta_id": uuid.uuid7(),
                 "organizaciones": [],
                 "version": 1,
                 "items": [
@@ -163,12 +167,12 @@ def test_evaluacion_rechaza_sin_certificacion_y_por_stock_insuficiente(base_de_d
                             {
                                 "cantidad": 2,
                                 "identificador_nacional": organizacion.identificador_nacional,
-                                "organizacion_id": 998,
+                                "organizacion_id": uuid.uuid7(),
                             }
                         ],
                         "cantidad_total": 2,
                         "codigo_recurso": ambulancia.codigo_recurso,
-                        "lote_item_id": 12,
+                        "lote_item_id": uuid.uuid7(),
                         "tipo_recurso": "rescate",
                         "unidad": "unidades",
                     }
@@ -180,3 +184,157 @@ def test_evaluacion_rechaza_sin_certificacion_y_por_stock_insuficiente(base_de_d
     item = resultado["ofertas"][0]["items"][0]["aportes"][0]
     assert item["clasificacion"] == "rechazada"
     assert "disponibilidad" in item["motivo"]
+
+
+def _ong_con_ambulancias(*, cuit: str = "30-33333333-3", stock: int = 5) -> Organizacion:
+    ambulancia = Item(
+        codigo_recurso="RSR-AMBULANCIAS",
+        nombre="Ambulancias",
+        tipo=TipoItem.rescate,
+        unidad_medida="unidades",
+        consumible=False,
+    )
+    certificacion = Certificacion(nombre="Rescate", tipo=TipoItem.rescate)
+    organizacion = _organizacion(cuit=cuit, nombre="ONG Ambulancias")
+    organizacion.inventario = Inventario(
+        items=[InventarioItem(item=ambulancia, cantidad_disponible=stock)]
+    )
+    organizacion.certificaciones = [
+        OrganizacionCertificacion(
+            certificacion=certificacion,
+            nivel_riesgo_permitido=NivelCertificacion.alta,
+            fecha_emision=datetime.now(UTC),
+        )
+    ]
+    db.session.add_all([ambulancia, certificacion, organizacion])
+    db.session.commit()
+    return organizacion
+
+
+def _aporte(identificador: str | None, cantidad: int) -> dict:
+    return {
+        "cantidad": cantidad,
+        "identificador_nacional": identificador,
+        "organizacion_id": uuid.uuid7(),
+    }
+
+
+def _item_ofertado(aportes: list[dict]) -> dict:
+    return {
+        "aportes": aportes,
+        "cantidad_total": sum(aporte["cantidad"] for aporte in aportes),
+        "codigo_recurso": "RSR-AMBULANCIAS",
+        "lote_item_id": uuid.uuid7(),
+        "tipo_recurso": "rescate",
+        "unidad": "unidades",
+    }
+
+
+def _oferta(items: list[dict]) -> dict:
+    return {
+        "fecha_creacion": datetime.now(UTC),
+        "oferta_id": uuid.uuid7(),
+        "organizaciones": [],
+        "version": 1,
+        "items": items,
+    }
+
+
+def test_evaluacion_rechaza_solo_el_aporte_sin_cuit(base_de_datos):
+    organizacion = _ong_con_ambulancias()
+
+    resultado = evaluar_ofertas(
+        emergencia_id=uuid.uuid7(),
+        nivel_gravedad="ALTA",
+        ofertas=[
+            _oferta(
+                [
+                    _item_ofertado(
+                        [
+                            _aporte(None, 1),
+                            _aporte("   ", 1),
+                            _aporte(organizacion.identificador_nacional, 2),
+                        ]
+                    )
+                ]
+            )
+        ],
+    )
+
+    sin_cuit, en_blanco, valido = resultado["ofertas"][0]["items"][0]["aportes"]
+    assert sin_cuit["identificador_nacional"] is None
+    assert sin_cuit["clasificacion"] == "rechazada"
+    assert sin_cuit["motivo"] == MOTIVO_SIN_IDENTIFICADOR
+    assert sin_cuit["compromiso_registrado"] is False
+    assert en_blanco["clasificacion"] == "rechazada"
+    assert en_blanco["motivo"] == MOTIVO_SIN_IDENTIFICADOR
+    assert valido["clasificacion"] == "principal"
+    assert valido["compromiso_registrado"] is True
+    compromiso = db.session.query(Compromiso).one()
+    assert [item.cantidad_comprometida for item in compromiso.items] == [2]
+
+
+def test_evaluacion_encuentra_la_ong_con_cuit_sin_guiones(base_de_datos):
+    _ong_con_ambulancias(cuit="30-33333333-3")
+
+    resultado = evaluar_ofertas(
+        emergencia_id=uuid.uuid7(),
+        nivel_gravedad="ALTA",
+        ofertas=[_oferta([_item_ofertado([_aporte(" 30333333333 ", 2)])])],
+    )
+
+    aporte = resultado["ofertas"][0]["items"][0]["aportes"][0]
+    assert aporte["clasificacion"] == "principal"
+    # La respuesta repite el identificador como llegó: la web cruza el resultado por ese dato.
+    assert aporte["identificador_nacional"] == "30333333333"
+    compromiso = db.session.query(Compromiso).one()
+    assert compromiso.organizacion.identificador_nacional == "30-33333333-3"
+
+
+def test_evaluacion_suma_el_mismo_recurso_de_una_ong_pedido_en_dos_lotes(base_de_datos):
+    organizacion = _ong_con_ambulancias(stock=5)
+    cuit = organizacion.identificador_nacional
+
+    resultado = evaluar_ofertas(
+        emergencia_id=uuid.uuid7(),
+        nivel_gravedad="ALTA",
+        ofertas=[
+            _oferta(
+                [
+                    _item_ofertado([_aporte(cuit, 2)]),
+                    _item_ofertado([_aporte(cuit, 3)]),
+                ]
+            )
+        ],
+    )
+
+    aportes = [item["aportes"][0] for item in resultado["ofertas"][0]["items"]]
+    assert [aporte["clasificacion"] for aporte in aportes] == ["principal", "principal"]
+    assert all(aporte["compromiso_registrado"] for aporte in aportes)
+    compromiso = db.session.query(Compromiso).one()
+    assert [item.cantidad_comprometida for item in compromiso.items] == [5]
+    assert db.session.query(InventarioItem).one().cantidad_disponible == 0
+
+
+def test_evaluacion_controla_el_stock_acumulado_entre_lineas_de_una_ong(base_de_datos):
+    organizacion = _ong_con_ambulancias(stock=5)
+    cuit = organizacion.identificador_nacional
+
+    resultado = evaluar_ofertas(
+        emergencia_id=uuid.uuid7(),
+        nivel_gravedad="ALTA",
+        ofertas=[
+            _oferta([_item_ofertado([_aporte(cuit, 3)])]),
+            _oferta([_item_ofertado([_aporte(cuit, 3)])]),
+        ],
+    )
+
+    primero = resultado["ofertas"][0]["items"][0]["aportes"][0]
+    segundo = resultado["ofertas"][1]["items"][0]["aportes"][0]
+    assert primero["clasificacion"] == "principal"
+    assert segundo["clasificacion"] == "rechazada"
+    assert "(2 disponible)" in segundo["motivo"]
+    assert segundo["compromiso_registrado"] is False
+    compromiso = db.session.query(Compromiso).one()
+    assert [item.cantidad_comprometida for item in compromiso.items] == [3]
+    assert db.session.query(InventarioItem).one().cantidad_disponible == 2

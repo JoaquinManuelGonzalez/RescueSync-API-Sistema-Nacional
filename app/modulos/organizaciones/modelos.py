@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import enum
+import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
-    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -17,11 +17,13 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    Uuid,
     func,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.identificadores import nuevo_id
 from app.extensiones import db
 
 if TYPE_CHECKING:
@@ -79,10 +81,7 @@ class Organizacion(db.Model):
 
     __tablename__ = "organizaciones"
 
-    id: Mapped[int] = mapped_column(
-        BigInteger().with_variant(Integer, "sqlite"),
-        primary_key=True,
-    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=nuevo_id)
     tipo: Mapped[TipoOrganizacion] = mapped_column(
         Enum(
             TipoOrganizacion,
@@ -153,13 +152,10 @@ class HistorialHabilitacion(db.Model):
 
     __tablename__ = "historial_habilitaciones"
 
-    id: Mapped[int] = mapped_column(
-        BigInteger().with_variant(Integer, "sqlite"),
-        primary_key=True,
-    )
-    organizacion_id: Mapped[int] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=nuevo_id)
+    organizacion_id: Mapped[uuid.UUID] = mapped_column(
         "id_organizacion",
-        BigInteger().with_variant(Integer, "sqlite"),
+        Uuid,
         ForeignKey("organizaciones.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -188,9 +184,9 @@ class HistorialHabilitacion(db.Model):
         nullable=False,
     )
     motivo: Mapped[str | None] = mapped_column(Text, nullable=True)
-    cuenta_id: Mapped[int | None] = mapped_column(
+    cuenta_id: Mapped[uuid.UUID | None] = mapped_column(
         "id_cuenta",
-        BigInteger().with_variant(Integer, "sqlite"),
+        Uuid,
         ForeignKey("cuentas.id", ondelete="SET NULL"),
         nullable=True,
         comment="Cuenta de la API que hizo el cambio. Null en semillas y migraciones.",
@@ -220,7 +216,7 @@ class Certificacion(db.Model):
 
     __tablename__ = "certificaciones"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=nuevo_id)
     nombre: Mapped[str] = mapped_column(String(255), nullable=False)
     tipo: Mapped[TipoItem] = mapped_column(
         Enum(
@@ -245,7 +241,7 @@ class Item(db.Model):
 
     __tablename__ = "items"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=nuevo_id)
     codigo_recurso: Mapped[str] = mapped_column(
         String(200),
         nullable=False,
@@ -284,10 +280,10 @@ class Inventario(db.Model):
 
     __tablename__ = "inventarios"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    organizacion_id: Mapped[int] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=nuevo_id)
+    organizacion_id: Mapped[uuid.UUID] = mapped_column(
         "id_organizacion",
-        BigInteger().with_variant(Integer, "sqlite"),
+        Uuid,
         ForeignKey("organizaciones.id", ondelete="CASCADE"),
         nullable=False,
         unique=True,
@@ -320,16 +316,16 @@ class InventarioItem(db.Model):
         CheckConstraint("cantidad_disponible >= 0", name="cantidad_disponible_no_negativa"),
     )
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    inventario_id: Mapped[int] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=nuevo_id)
+    inventario_id: Mapped[uuid.UUID] = mapped_column(
         "id_inventario",
-        Integer,
+        Uuid,
         ForeignKey("inventarios.id", ondelete="CASCADE"),
         nullable=False,
     )
-    item_id: Mapped[int] = mapped_column(
+    item_id: Mapped[uuid.UUID] = mapped_column(
         "id_item",
-        Integer,
+        Uuid,
         ForeignKey("items.id"),
         nullable=False,
     )
@@ -359,16 +355,16 @@ class OrganizacionCertificacion(db.Model):
         ),
     )
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    organizacion_id: Mapped[int] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=nuevo_id)
+    organizacion_id: Mapped[uuid.UUID] = mapped_column(
         "id_organizacion",
-        BigInteger().with_variant(Integer, "sqlite"),
+        Uuid,
         ForeignKey("organizaciones.id", ondelete="CASCADE"),
         nullable=False,
     )
-    certificacion_id: Mapped[int] = mapped_column(
+    certificacion_id: Mapped[uuid.UUID] = mapped_column(
         "id_certificacion",
-        Integer,
+        Uuid,
         ForeignKey("certificaciones.id", ondelete="CASCADE"),
         nullable=False,
     )
